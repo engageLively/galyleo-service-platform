@@ -13,13 +13,14 @@ HUB_API_URL = os.environ['JUPYTERHUB_API_URL']
 SERVICE_API_TOKEN =  os.environ['GALYLEO_SERVICE_API_TOKEN'] # must agree with the service API token for Galyleo in the hub's config.yaml
 HUB_URL  = os.environ['JUPYTERHUB_URL'] 
 GALYLEO_CLIENT_ID = os.environ['GALYLEO_CLIENT_ID'] 
-# auth = HubOAuth(api_token=os.environ['JUPYTERHUB_API_TOKEN'], cache_max_age=60)
+OAUTH_CALLBACK_URL = '/services/galyleo/callback'
+
 auth = HubOAuth(
     api_url = HUB_API_URL,
     api_token=SERVICE_API_TOKEN,
     oauth_client_id = GALYLEO_CLIENT_ID,
     # client_secret = '12345678',
-    oauth_redirect_uri = f'{HUB_URL}'/services/galyleo/callback',
+    oauth_redirect_uri = f'{HUB_URL}{OAUTH_CALLBACK_URL}',
     cache_max_age=60)
 
 token_auth = HubAuth(
@@ -38,7 +39,7 @@ def oauth_ok():
         return True
     return False
     
-@app.route('/services/hello/callback')
+@app.route(OAUTH_CALLBACK_URL)
 def oauth_callback():
     code = request.args.get('code', None)
     if code is None:
