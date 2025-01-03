@@ -7,10 +7,8 @@ import os
 
 app.url_map.strict_slashes = False
 
-
 app.secret_key = os.environ['GALYLEO_SECRET_KEY']  # must agree with the secret key  for Galyleo in the hub's config.yaml
 
-    
 HUB_API_URL = os.environ['JUPYTERHUB_API_URL']
 SERVICE_API_TOKEN =  os.environ['GALYLEO_SERVICE_API_TOKEN'] # must agree with the service API token for Galyleo in the hub's config.yaml
 HUB_URL  = os.environ['JUPYTERHUB_URL'] 
@@ -61,7 +59,6 @@ def oauth_callback():
     response = make_response(redirect(next_url))
     return response
 
-print(auth._login_url())
 def authenticated(f):
     """Decorator for authenticating with the Hub via OAuth"""
 
@@ -95,7 +92,7 @@ def show_editor():
   Return the Galyleo editor page (probably done through JLab)
   """
 
-@app.route("/services/galyleo/publish", , methods=['POST'])
+@app.route("/services/galyleo/publish",  methods=['POST'])
 @authenticated
 def publish_dashboard(user):
   """
@@ -105,7 +102,6 @@ def publish_dashboard(user):
   3. public -- a boolean which says this is hub users only/public
   Uses OAuth authentication from the Hub/Bearer token
   """
-  
 
 
 @app.route("/services/galyleo/view_dashboard",  methods=['GET', 'POST'])
@@ -129,10 +125,6 @@ def publish_dataset(user):
   Uses OAuth authentication from the Hub or a bearer token
   """
   
-
-  
-
-
 @app.route('/services/galyleo/get_table_names')
 @authenticated
 def get_table_names(user):
