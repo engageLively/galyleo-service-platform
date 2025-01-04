@@ -214,3 +214,5 @@ def get_filtered_rows(user):
         The filtered rows as a JSONified list of lists
     '''
 
+# Initialization: Create a Table Server which has RemoteSDML Tables for all stored tables
+# Also add routes to just get a dashboard using only the user/dashboard.gd.json name, not the full URL.  Or fix view to do this.
