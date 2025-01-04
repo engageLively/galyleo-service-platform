@@ -19,7 +19,7 @@ def _get_blob(path):
 
 def _read_blob(path):
   # Utility for get_dashboard and get_table.  Open the path as a JSON file, read it, 
-  # and return the resulting data structure.  Returns None for a FileNotFoundError
+  # and return the resulting data structure.  Returns None for a NotFound
   """Reads a blob from a GCS bucket."""
 
   blob = _get_blob(path)
@@ -41,7 +41,14 @@ def _write_blob(path, object):
   
     blob.upload_from_string(json_string, content_type="application/json")
 
-   
+def _delete_blob(path):
+    """Deletes a blob from a GCS bucket."""
+    # Initialize the client
+    
+    blob = _get_blob(path)
+    blob.delete()
+    
+
 
 def get_dashboard(user, dashboard_name):
   '''
@@ -86,7 +93,7 @@ def put_dashboard(user, dashboard_name, dashboard_object):
   Returns:
     None
   Raises:
-    JSONDecodeError if the dashboard_object can't be JSONified and FileNotFoundError if dashboards/user/dashboard_name can't be written
+    JSONDecodeError if the dashboard_object can't be JSONified and NotFound if dashboards/user/dashboard_name can't be written
   '''
   _write_blob(f'dashboards/{user}/{dashboard_name}', dashboard_object)
 
@@ -101,9 +108,37 @@ def put_table(user, table_name, sdml_table):
   Returns:
     None
   Raises:
-    JSONDecodeError if the sdml_table can't be JSONified and FileNotFoundError if tables/user/table_name can't be written
+    JSONDecodeError if the sdml_table can't be JSONified and NotFound if tables/user/table_name can't be written
   '''
   _write_blob(f'{BUCKET_NAME}/tables/{user}/{table_name}', sdml_table)
+
+def delete_dashboard(user, dashboard_name):
+  '''
+  Delete the user's daashboard dashboard_name
+  Parameters:
+    user: the name of the user who owns the dashboard
+    dashboard_name: the name of the dashboard to delete
+  Returns:
+    None
+  Raises:
+    NotFound if dashboards/user/dashboard_name can't be found
+  '''
+  _delete_blob(f'dashboards/{user}/{dashboard_name}'
+               )
+
+def delete_table(user, table_name):
+  '''
+  Delete the user's   sdml_table table_name 
+  Parameters:
+    user: the name of the user who owns the table
+    table_name: the name of the table to delete
+    
+  Returns:
+    None
+  Raises:
+    NotFound if tables/user/table_name can't be found
+  '''
+  _delete_blob(f'{BUCKET_NAME}/tables/{user}/{table_name}')
 
 def _all_blobs_matching_pattern(pattern):
   client = storage.client()
