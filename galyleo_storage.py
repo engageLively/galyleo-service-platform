@@ -5,7 +5,8 @@ from google.cloud import storage
 from google.cloud.exceptions import NotFound
 
 
-def _get_blob(path):
+def _get_blob(path = None):
+  if path is None: return None
   # Utility used by _read_blob and _write_json_to_blob to get the blob corresponding to path
   client = storage.Client()
 
@@ -20,6 +21,7 @@ def _read_blob(path):
   """Reads a blob from a GCS bucket."""
 
   blob = _get_blob(path)
+  if blob is None: return None
   # Download the blob's content as a string
   try:
     content = blob.download_as_text()
@@ -33,6 +35,8 @@ def _write_blob(path, object):
     """Writes a JSON string to a blob in a GCS bucket."""
     # Get the bucket and blob
     blob = _get_blob(path)
+    if blob is None:
+      raise NotFound(path)
     # Upload the JSON string to the blob
     json_string = object if type(object) == str else dumps(object)
   
@@ -44,8 +48,9 @@ def _delete_blob(path):
     
     blob = _get_blob(path)
     blob.delete()
-    
+   
 
+# think about getting from an URL, not user/dashboard name
 
 def get_dashboard(user, dashboard_name):
   '''
@@ -134,7 +139,7 @@ def delete_table(user, table_name):
   Raises:
     NotFound if tables/user/table_name can't be found
   '''
-  _delete_blob(f'{os.environ['GALYLEO_STORAGE_BUCKET']}/tables/{user}/{table_name}')
+  _delete_blob(f'tables/{user}/{table_name}')
 
 def _all_blobs_matching_pattern(pattern):
   # utility which finds all blobs matching pattern, where 
@@ -144,18 +149,23 @@ def _all_blobs_matching_pattern(pattern):
   blobs = client.list_blobs(os.environ['GALYLEO_STORAGE_BUCKET'])
   return  [blob.name for blob in blobs if fnmatch.fnmatch(blob.name, pattern)]
 
+def _trim_prefix(list_of_strings, prefix):
+  return [string[len(prefix):] for string in list_of_strings]
+
 def list_tables(user = '*'):
    '''
    Return the list of tables stored in the repo.  
    '''
-   return _all_blobs_matching_pattern(f'tables/{user}/*.sdml')
+   table_paths = _all_blobs_matching_pattern(f'tables/{user}/*.sdml')
+   return _trim_prefix(table_paths, 'tables/')
 
 
 def list_dashboards(user = '*'):
    '''
    Return the list of dashboards stored in the repo.  
    '''
-   return _all_blobs_matching_pattern(f'tables/{user}/*.gd.json')
+   dashboard_paths =  _all_blobs_matching_pattern(f'dashboards/{user}/*.gd.json')
+   return _trim_prefix(dashboard_paths, 'dashboards/')
    
 
 #--------------------------------------------------------------------------
@@ -177,16 +187,41 @@ TEST_USER = 'test'
 def test_clean():
   # clean out all the blobs from previous tests
   pattern = f'*/{TEST_USER}/*'
-  print( os.environ['GOOGLE_APPLICATION_CREDENTIALS'])
   old_blob_names = _all_blobs_matching_pattern(pattern)
   for blob_name in old_blob_names:
     _delete_blob(blob_name)
   blob_names = _all_blobs_matching_pattern(pattern)
   assert(blob_names == [])
 
-def test_add_table():
-  url = 'https://raw.githubusercontent.com/Global-Data-Plane/sdtp-examples/refs/heads/main/simple-table-example/tables/electoral_college.sdml'
-  table = requests.get(url).json()
+def test_read_null():
+  null = _read_blob(None)
+  assert(null is None)
+
+# should do a read_bad_json test
+
+def test_write_null():
+  failure_caught = False
+  try:
+    null = _write_blob(None, None)
+  except NotFound:
+    failure_caught = True
+  assert failure_caught, "Writing to None didn't cause an error"
+
+import datetime # to get bad json
+
+def test_write_bad_json():
+  failure_caught = False
+  bad_json = datetime.datetime.now()
+  try:
+    null = _write_blob('junk/junk.json', bad_json)
+  except (TypeError, JSONDecodeError):
+    failure_caught = True
+  assert failure_caught, "Writing bad JSON didn't cause an  error"
+
+TABLE_URL = 'https://raw.githubusercontent.com/Global-Data-Plane/sdtp-examples/refs/heads/main/simple-table-example/tables/electoral_college.sdml'
+
+def test_add_and_read_table():
+  table = requests.get(TABLE_URL).json()
   put_table(TEST_USER, 'electoral_college.sdml', table)
   table1 = get_table(TEST_USER, 'electoral_college.sdml')
   assert(table1 is not None)
@@ -197,9 +232,77 @@ def test_add_table():
   assert(table2 is not None)
   assert(table2 == table)
 
+DASHBOARD_URL = 'https://raw.githubusercontent.com/engageLively/galyleo-examples/refs/heads/main/demos/presidential-elections/elections-formatted.gd.json'
 
+def test_add_and_read_dashboard():
+  dashboard = requests.get(DASHBOARD_URL).json()
+  put_dashboard(TEST_USER, 'elections.gd.json', dashboard)
+  dashboard1 = get_dashboard(TEST_USER, 'elections.gd.json')
+  assert(dashboard1 is not None)
+  assert(dashboard1 == dashboard)
+  dashboard_as_json = dumps(dashboard1)
+  put_dashboard(TEST_USER, 'elections_json.gd.json', dashboard_as_json)
+  dashboard2 = get_dashboard(TEST_USER, 'elections_json.gd.json')
+  assert(dashboard2 is not None)
+  assert(dashboard2 == dashboard1)
+
+def test_delete_table():
+  table = requests.get(TABLE_URL).json()
+  put_table(TEST_USER, 'electoral_college.sdml', table)
+  delete_table(TEST_USER, 'electoral_college.sdml')
+  table1 = get_table(TEST_USER, 'electoral_college.sdml')
+  assert(table1 is None)
+  failure_caught = False
+  try:
+    delete_table(TEST_USER, 'electoral_college.sdml')
+  except NotFound:
+    failure_caught = True
+  assert failure_caught, "Did not throw error on attempt to delete a null"
+
+def test_delete_dashboard():
+  dashboard = requests.get(DASHBOARD_URL).json()
+  put_dashboard(TEST_USER, 'elections.gd.json', dashboard)
+  delete_dashboard(TEST_USER, 'elections.gd.json')
+  dasboard1 = get_dashboard(TEST_USER, 'elections.gd.json')
+  assert(dasboard1 is None)
+  failure_caught = False
+  try:
+    delete_dashboard(TEST_USER, 'elections.gd.json')
+  except NotFound:
+    failure_caught = True
+  assert failure_caught, "Did not throw error on attempt to delete a null"
+
+
+def test_list_tables():
+  test_clean() # get rid of any junk
+  test_add_and_read_table() # to get the tables in the bucket
+  tables = set(list_tables())
+  expected = {f'{TEST_USER}/electoral_college.sdml', f'{TEST_USER}/electoral_college_json.sdml'}
+  assert(tables == expected)
+  _write_blob(f'tables/{TEST_USER}/foo.txt', 'foo')
+  tables = set(list_tables())
+  assert(tables == expected)
+
+
+def test_list_dashboards():
+  test_clean() # get rid of any junk
+  test_add_and_read_dashboard() # to get the dashboards in the bucket
+  dashboards = set(list_dashboards())
+  expected = {f'{TEST_USER}/elections.gd.json', f'{TEST_USER}/elections_json.gd.json'}
+  assert(dashboards == expected)
+  _write_blob(f'dashboards/{TEST_USER}/foo.txt', 'foo')
+  dashboards = set(list_dashboards())
+  assert(dashboards == expected)
 
 setup_tests()
-print( os.environ['GOOGLE_APPLICATION_CREDENTIALS'])
+# print( os.environ['GOOGLE_APPLICATION_CREDENTIALS'])
+# test_clean()
+# test_add_table()
+# test_add_dashboard()
+# test_read_null()
+# test_write_bad_json()
+test_delete_table()
+test_delete_dashboard()
 test_clean()
-test_add_table()
+test_list_tables()
+test_list_dashboards()
