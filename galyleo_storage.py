@@ -4,16 +4,13 @@ from json import load, loads, dump, dumps, JSONDecodeError
 from google.cloud import storage
 from google.cloud.exceptions import NotFound
 
-BUCKET_NAME = os.environ['GALYLEO_STORAGE_BUCKET']
-PROJECT_NAME = os.environ['GOOGLE_PROJECT']
-
 
 def _get_blob(path):
   # Utility used by _read_blob and _write_json_to_blob to get the blob corresponding to path
   client = storage.Client()
 
   # Get the bucket and blob
-  bucket = client.bucket(BUCKET_NAME)
+  bucket = client.bucket(os.environ['GALYLEO_STORAGE_BUCKET'])
   return  bucket.blob(path)
   
 
@@ -110,7 +107,7 @@ def put_table(user, table_name, sdml_table):
   Raises:
     JSONDecodeError if the sdml_table can't be JSONified and NotFound if tables/user/table_name can't be written
   '''
-  _write_blob(f'{BUCKET_NAME}/tables/{user}/{table_name}', sdml_table)
+  _write_blob(f'tables/{user}/{table_name}', sdml_table)
 
 def delete_dashboard(user, dashboard_name):
   '''
@@ -123,8 +120,7 @@ def delete_dashboard(user, dashboard_name):
   Raises:
     NotFound if dashboards/user/dashboard_name can't be found
   '''
-  _delete_blob(f'dashboards/{user}/{dashboard_name}'
-               )
+  _delete_blob(f'dashboards/{user}/{dashboard_name}')
 
 def delete_table(user, table_name):
   '''
@@ -138,11 +134,14 @@ def delete_table(user, table_name):
   Raises:
     NotFound if tables/user/table_name can't be found
   '''
-  _delete_blob(f'{BUCKET_NAME}/tables/{user}/{table_name}')
+  _delete_blob(f'{os.environ['GALYLEO_STORAGE_BUCKET']}/tables/{user}/{table_name}')
 
 def _all_blobs_matching_pattern(pattern):
-  client = storage.client()
-  blobs = client.list_blobs(BUCKET_NAME)
+  # utility which finds all blobs matching pattern, where 
+  # pattern is a standard glob-style pattern.  Used by 
+  # list_tables and list_dashboards
+  client = storage.Client()
+  blobs = client.list_blobs(os.environ['GALYLEO_STORAGE_BUCKET'])
   return  [blob.name for blob in blobs if fnmatch.fnmatch(blob.name, pattern)]
 
 def list_tables(user = '*'):
@@ -158,3 +157,49 @@ def list_dashboards(user = '*'):
    '''
    return _all_blobs_matching_pattern(f'tables/{user}/*.gd.json')
    
+
+#--------------------------------------------------------------------------
+# tests
+#---------------------------------------------------------------------------
+from pathlib import Path
+import  sys
+import requests
+
+def setup_tests():
+  parent = str(Path(__file__).parent)
+  key_path = os.path.join(parent, '.keys', 'galyleo-server-1105bf54b967.json')
+  os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = key_path
+  os.environ['GALYLEO_STORAGE_BUCKET'] = 'galyleo-server-test-bucket'
+  os.environ['GOOGLE_PROJECT'] = 'galyleo-server'
+
+TEST_USER = 'test'
+
+def test_clean():
+  # clean out all the blobs from previous tests
+  pattern = f'*/{TEST_USER}/*'
+  print( os.environ['GOOGLE_APPLICATION_CREDENTIALS'])
+  old_blob_names = _all_blobs_matching_pattern(pattern)
+  for blob_name in old_blob_names:
+    _delete_blob(blob_name)
+  blob_names = _all_blobs_matching_pattern(pattern)
+  assert(blob_names == [])
+
+def test_add_table():
+  url = 'https://raw.githubusercontent.com/Global-Data-Plane/sdtp-examples/refs/heads/main/simple-table-example/tables/electoral_college.sdml'
+  table = requests.get(url).json()
+  put_table(TEST_USER, 'electoral_college.sdml', table)
+  table1 = get_table(TEST_USER, 'electoral_college.sdml')
+  assert(table1 is not None)
+  assert(table1 == table)
+  table_as_json = dumps(table)
+  put_table(TEST_USER, 'electoral_college_json.sdml', table_as_json)
+  table2 = get_table(TEST_USER, 'electoral_college_json.sdml')
+  assert(table2 is not None)
+  assert(table2 == table)
+
+
+
+setup_tests()
+print( os.environ['GOOGLE_APPLICATION_CREDENTIALS'])
+test_clean()
+test_add_table()
