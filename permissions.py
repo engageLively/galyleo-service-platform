@@ -4,8 +4,8 @@ import os
 
 # make sure the Google Cloud credentials are appropriately stored and accessed
 
-PUBLIC = 'PUBLIC'  '''Access is open to everyone if this permission is set'''
-HUB = 'HUB'  '''Access is open to alll hub users if this permission is set'''
+PUBLIC = 'PUBLIC'  # Access is open to everyone if this permission is set
+HUB = 'HUB'  # Access is open to all hub users if this permission is set
 
 class DatastoreManager:
   '''
@@ -83,10 +83,10 @@ class DatastoreManager:
     if object is None:
       with self.client.transaction():
         # create the object and store it
-        object = datastore.Entity("URL")
+        key = self.client.key("URL", url)
+        object = datastore.Entity(key)
         object.update(
           {
-            "url": url,
             "users": [owner]
           }
         )
@@ -104,7 +104,7 @@ class DatastoreManager:
         self._add_user(url, owner)
         return
       else:
-        raise ValueError(f'Conflicting entity at {url} already')
+        raise ValueError(f'Conflicting entity at {url} already in database')
       
   def delete_object(self, url):
     '''
@@ -119,26 +119,7 @@ class DatastoreManager:
 
    
 
-  def get_users(self, url):
-    '''
-    Return the set of users with access to this object.  Note that if HUB or PUBLIC has access to
-    this object, then that is the only item returned, even if others are stored
-    Parameters:
-      url: URL for the object to get the user list for
-    Returns:
-      The set of users which have access to the object, {PUBLIC} if the object
-      is readable by everyone, {HUB} if it's accessible by everyone, the empty
-      set if the object doesn't exist
-    '''
-    object = self._get_object(url)
-    if object is not None:
-      users = set(object['users'])
-      if PUBLIC in users:
-        return set(PUBLIC)
-      elif HUB in users:
-        return set(HUB)
-      return users
-    else: return set()
+  
 
   def add_user_access(self, url, user_name): 
     '''
@@ -171,6 +152,9 @@ class DatastoreManager:
     Returns:
       Nothing
     '''
+    # Note that we shouldn't be able to delete the access of the owner.
+    # This requires keeping a separate field, owner, which we'll set in create
+    # and this will check and do nothing on an attempt to delete owner.
     object = self._get_object(url)
     if object is None:
       # shouldn't happen....
@@ -178,12 +162,33 @@ class DatastoreManager:
     else:
       self._delete_user(url, user_name)
 
+  def get_users(self, url):
+    '''
+    Return the set of users with access to this object.  Note that if HUB or PUBLIC has access to
+    this object, then that is the only item returned, even if others are stored
+    Parameters:
+      url: URL for the object to get the user list for
+    Returns:
+      The set of users which have access to the object, {PUBLIC} if the object
+      is readable by everyone, {HUB} if it's accessible by everyone, the empty
+      set if the object doesn't exist
+    '''
+    object = self._get_object(url)
+    if object is not None:
+      users = set(object['users'])
+      if PUBLIC in users:
+        return set([PUBLIC])
+      elif HUB in users:
+        return set([HUB])
+      else: return users
+    else: return set()
+
   def clear(self):
     '''
     Delete ALL the objects in this namespace.  Primarily designed for test use
 
     '''
-    query = self.client.query(kind = "URL", namespace = self.namespace)
+    query = self.client.query(kind = "URL")
     query.keys_only()
     keys = query.fetch()
     self.client.delete_multi(keys)
@@ -201,11 +206,86 @@ def setup_tests():
   os.environ['GOOGLE_PROJECT'] = 'galyleo-server'
   os.environ['DATASTORE_DATABASE'] = 'galyleo-server'
 
-setup_tests()
-manager = DatastoreManager('test')
-manager.clear()
 
-pass
+
 
 def test_create_object():
   manager.create_object('t1', 'user1')
+  key = manager.client.key("URL", "t1")
+  object = manager.client.get(key)
+  assert(object is not None)
+  assert(object["users"] == ["user1"] )
+  manager.create_object('t1', 'user1')
+  object = manager.client.get(key)
+  assert(object is not None)
+  assert(object["users"] == ["user1"] )
+  manager.create_object('t1', 'user2', True)
+  object = manager.client.get(key)
+  assert(object is not None)
+  assert(set(object["users"]) == set(["user1", "user2"]))
+  failure_caught = False
+  try:
+    manager.create_object('t1', 'user3')
+  except ValueError:
+    failure_caught = True
+  assert failure_caught, "Error when attempt to add existing url to database not caught"
+
+def test_delete_object():
+  manager.create_object('t1', 'user1')
+  key = manager.client.key("URL", "t1")
+  manager.delete_object('t1')
+  object = manager.client.get(key)
+  assert object is None
+
+def test_add_user():
+  manager.create_object('t1', 'user1')
+  manager.add_user_access('t1', 'user1')
+  key = manager.client.key("URL", "t1")
+  object = manager.client.get(key)
+  assert object["users"] == ['user1']
+  manager.add_user_access('t1', 'user2')
+  object = manager.client.get(key)
+  assert set(object["users"]) == {'user1', 'user2'}
+
+def test_delete_user():
+  manager.create_object('t1', 'user1')
+  manager.add_user_access('t1', 'user2')
+  key = manager.client.key("URL", "t1")
+  manager.delete_user_access('t1', 'user2')
+  object = manager.client.get(key)
+  assert object["users"] == ['user1']
+  manager.delete_user_access('t1', 'user3')
+  object = manager.client.get(key)
+  assert object["users"] == ['user1']
+
+def test_get_users():
+  manager.create_object('t1', 'user1')
+  assert manager.get_users("t1") == {"user1"}
+  manager.add_user_access('t1', 'user2')
+  assert manager.get_users("t1") == {"user1", "user2"}
+  manager.add_user_access('t1', 'HUB')
+  assert manager.get_users("t1") == {"HUB"}
+  manager.add_user_access('t1', 'PUBLIC')
+  assert manager.get_users("t1") == {"PUBLIC"}
+  manager.delete_user_access('t1', 'PUBLIC')
+  assert manager.get_users("t1") == {"HUB"}
+  manager.delete_user_access('t1', 'HUB')
+  assert manager.get_users("t1") == {"user1", "user2"}
+  manager.delete_user_access('t1', 'user2')
+  assert manager.get_users("t1") == {"user1"}
+ 
+
+  
+  
+setup_tests()
+manager = DatastoreManager('test')
+manager.clear()
+test_create_object()
+manager.clear()
+test_delete_object()
+manager.clear()
+test_add_user()
+manager.clear()
+test_delete_user()
+manager.clear()
+test_get_users()
