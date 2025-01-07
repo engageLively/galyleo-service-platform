@@ -19,6 +19,7 @@ For reference, the configuration for the service in the JupyterHub's config.yaml
 | BUCKET_NAME | name of the bucket where dashboards and tables are stored |
 | PROJECT_NAME | name of the google cloud bucket |
 | GOOGLE_APPLICATION_CREDENTIALS | path (in the container) to the Google service account key |
+| DATASTORE_DATABASE | Name of the database used to store permissions.  This must be created prior to the project. |
 
 # Required Google Permissions
 The service account must have:
