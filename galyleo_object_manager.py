@@ -77,38 +77,38 @@ class GalyleoTableServer(TableServer):
     except NotFound:
       pass
 
-  def add_dashboard(user, dashboard_name, dashboard_object):
-    '''
-    Put a dashboard in the repository under user/dashboard_name.gd.json.
-    Checks that it's a dictionary or a JSON string that becomes a dictionary
-    Parameters:
-      user: the name of the user publishing the dashboard
-      dashboard_name name of the dashboard
-      dashboard: the dashboard file (a JSON string or a dictonary in the Galyleo intermediate form)
-    Returns: 
-      The URL of the dashboard
-    Raises:
-      ValueError if the dashboard isn't in the right format
-    '''
+def add_dashboard(user, dashboard_name, dashboard_object):
+  '''
+  Put a dashboard in the repository under user/dashboard_name.gd.json.
+  Checks that it's a dictionary or a JSON string that becomes a dictionary
+  Parameters:
+    user: the name of the user publishing the dashboard
+    dashboard_name name of the dashboard
+    dashboard: the dashboard file (a JSON string or a dictonary in the Galyleo intermediate form)
+  Returns: 
+    The URL of the dashboard
+  Raises:
+    ValueError if the dashboard isn't in the right format
+  '''
 
-  def delete_dashboard(user, dashboard_name):
-    '''
-    Delete the dashboard user/dashboard_name.gd.json from the repository.
-    Parameters:
-      user: the name of the user deleting the dashboard
-      dashboard_name name of the dashboard
-    Returns: 
-      No return 
-    Raises:
-      NotFound if it can't find the dashboard
-    '''
+def delete_dashboard(user, dashboard_name):
+  '''
+  Delete the dashboard user/dashboard_name.gd.json from the repository.
+  Parameters:
+    user: the name of the user deleting the dashboard
+    dashboard_name name of the dashboard
+  Returns: 
+    No return 
+  Raises:
+    NotFound if it can't find the dashboard
+  '''
 
-  def list_dashboards(user = None):
-    '''
-    List all the dashboards under user in the repository, or, if user
-    is None, all the dashboards
-    Parameters:
-      user: the name of the user
-    Returns: 
-      list of URLs of the dashboards
-    '''
+def list_dashboards(user = None):
+  '''
+  List all the dashboards under user in the repository, or, if user
+  is None, all the dashboards
+  Parameters:
+    user: the name of the user
+  Returns: 
+    list of URLs of the dashboards
+  '''
