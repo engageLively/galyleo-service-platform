@@ -77,38 +77,68 @@ class GalyleoTableServer(TableServer):
     except NotFound:
       pass
 
-def add_dashboard(user, dashboard_name, dashboard_object):
+class DashboardManager:
   '''
-  Put a dashboard in the repository under user/dashboard_name.gd.json.
-  Checks that it's a dictionary or a JSON string that becomes a dictionary
-  Parameters:
-    user: the name of the user publishing the dashboard
-    dashboard_name name of the dashboard
-    dashboard: the dashboard file (a JSON string or a dictonary in the Galyleo intermediate form)
-  Returns: 
-    The URL of the dashboard
-  Raises:
-    ValueError if the dashboard isn't in the right format
+  A Manager that handles the publication and deletion of dashboards.  
+  Like the GalyleoTableServer, it needs the root_url for returns
   '''
+  def __init__(self, root_url):
+    '''
+    Initialize the manager with the root_url of the server
+    Parameters:
+      root_url: the root URL of the sahboard server
+    '''
+    self.root_url = root_url
 
-def delete_dashboard(user, dashboard_name):
-  '''
-  Delete the dashboard user/dashboard_name.gd.json from the repository.
-  Parameters:
-    user: the name of the user deleting the dashboard
-    dashboard_name name of the dashboard
-  Returns: 
-    No return 
-  Raises:
-    NotFound if it can't find the dashboard
-  '''
+  def add_dashboard(self, user, dashboard_name, dashboard_object):
+    '''
+    Put a dashboard in the repository under user/dashboard_name.gd.json.
+    Checks that it's a dictionary or a JSON string that becomes a dictionary
+    Parameters:
+      user: the name of the user publishing the dashboard
+      dashboard_name name of the dashboard
+      dashboard: the dashboard file (a JSON string or a dictonary in the Galyleo intermediate form)
+    Returns: 
+      The URL of the dashboard
+    Raises:
+      ValueError if the dashboard_object isn't in the right format
+      JSONDecodeError if the 
+    '''
+    # normalize the name
+    if not dashboard_name.endswith('.gd.json'):
+      dashboard_name = dashboard_name + '.gd.json'
+    if type(dashboard_object) == str:
+      # then it must be a JSON form of the file
+      dashboard_object = loads(dashboard_object) # will throw a JSONDecodeError if it can't decode
+    if type(dashboard_object) == dict: # Should do more rigorous checking; for now we assume it's right
+      put_dashboard(user, dashboard_name, dashboard_object)
+      return f'{self.root_url}/{user}/{dashboard_name}'
+    else:
+      raise ValueError(f'{repr(dashboard_object)} is not a valid dashboard')
 
-def list_dashboards(user = None):
-  '''
-  List all the dashboards under user in the repository, or, if user
-  is None, all the dashboards
-  Parameters:
-    user: the name of the user
-  Returns: 
-    list of URLs of the dashboards
-  '''
+
+  def delete_dashboard(self, user, dashboard_name):
+    '''
+    Delete the dashboard user/dashboard_name.gd.json from the repository.
+    Parameters:
+      user: the name of the user deleting the dashboard
+      dashboard_name name of the dashboard
+    Returns: 
+      No return 
+    Raises:
+      NotFound if it can't find the dashboard
+    '''
+    if not dashboard_name.endswith('.gd.json'):
+      dashboard_name = dashboard_name + '.gd.json'
+    delete_dashboard(user, dashboard_name)
+
+  def list_dashboards(self, user = None):
+    '''
+    List all the dashboards under user in the repository, or, if user
+    is None, all the dashboards
+    Parameters:
+      user: the name of the user
+    Returns: 
+      list of URLs of the dashboards
+    '''
+    return list_dashboards(user)
