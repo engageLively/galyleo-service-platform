@@ -116,7 +116,7 @@ def put_table(user, table_name, sdml_table):
 
 def delete_dashboard(user, dashboard_name):
   '''
-  Delete the user's daashboard dashboard_name
+  Delete the user's dashboard dashboard_name
   Parameters:
     user: the name of the user who owns the dashboard
     dashboard_name: the name of the dashboard to delete
