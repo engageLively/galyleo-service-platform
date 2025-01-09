@@ -176,7 +176,7 @@ import  sys
 import requests
 
 def setup_tests():
-  parent = str(Path(__file__).parent)
+  parent = str(Path(__file__).parent.parent)
   key_path = os.path.join(parent, '.keys', 'galyleo-server-1105bf54b967.json')
   os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = key_path
   os.environ['GALYLEO_STORAGE_BUCKET'] = 'galyleo-server-test-bucket'

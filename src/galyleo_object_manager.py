@@ -2,6 +2,7 @@ from sdtp import TableServer
 from galyleo_storage import *
 from google.cloud.exceptions import NotFound
 
+
 '''
 A middleware layer between the Web/REST API and the storage manager.  The objects here
 manage the storagem, retrieval, and interface to persistent objects managed
@@ -11,11 +12,20 @@ datasets
 '''
 
 def _get_table_(path):
+  # A utility used to get the user name and table dictionary out of a path.
+  # This is only called on a path returned from the storage manager's 
+  # list_tables, which returns a list of the form "<user>/<table>.sdml"
+  # Given "user/table.sdml", returns an object with "table_name": user/table
+  # and table_dictionary: the table stored at user/table.sdml
+
   parts = path.split('/')
-  table_dictionary = get_table(parts[0], parts[1])
-  table_name = f'{parts[0]}/{parts[1][:len(".sdml")]}'
+  # len(parts) == 2 by the definition 
+  user = parts[-2]
+  raw_table = parts[-1]
+  table_dictionary = get_table(user, raw_table)
+  table_name = f'{user}/{raw_table[:-len(".sdml")]}'
   return {
-    "name": table_name,
+    "table_name": table_name,
     "table_dictionary": table_dictionary
   }
 
@@ -45,7 +55,7 @@ class GalyleoTableServer(TableServer):
     and stores the dictionary in the repo
     Parameters:
       user: the user publishing the table
-      table_name: name of the table (without the sdml suffix)
+      table_name: name of the table
       table_object: the table as a dictionary
     Returns
       the URL to access the table
@@ -57,7 +67,7 @@ class GalyleoTableServer(TableServer):
 
   def delete_table(self, user, table_name):
     '''
-    Delete a table from the server and the repositorr.  This just removes the table
+    Delete a table from the server and the repository.  This just removes the table
     from the TableServer (self)
     and deletestores the dictionary in the repo
     Parameters:
@@ -142,3 +152,47 @@ class DashboardManager:
       list of URLs of the dashboards
     '''
     return list_dashboards(user)
+  
+#---------------------------------------------------------------------------------
+# tests
+#---------------------------------------------------------------------------------
+import os
+os.environ['GALYLEO_ROOT_URL'] = 'http://test.galyleo.com'
+import requests
+
+test_tables =[
+  'electoral_college.sdml',
+  'nationwide_vote.sdml',
+  'nightingale.sdml',
+  'presidential_margins.sdml',
+  'presidential_vote.sdml',
+  'presidential_vote_history.sdml'
+]
+
+samples_root_url = 'https://raw.githubusercontent.com/Global-Data-Plane/sdtp-examples/refs/heads/main/simple-table-example/tables/'
+
+setup_tests()
+
+table_values = {}
+
+for table in test_tables:
+  table_key = 'test/' + table[:-len(".sdml")] # stored 
+  table_values[table] = {
+    "key": table_key,
+    "table_dictionary": requests.get(f'{samples_root_url}/{table}').json()
+  }
+def _init_table_storage():
+  for (name, object) in table_values.items():
+    put_table("test", name, object["table_dictionary"]) 
+
+def test_get_table():
+  paths = list_tables()
+  for path in paths:
+    name = path[len("test/"):]
+    value = _get_table_(path)
+    object = table_values[name]
+    assert(value["table_name"] == object["key"])
+    assert(value["table_dictionary"] == object["table_dictionary"])
+
+_init_table_storage()
+test_get_table()
