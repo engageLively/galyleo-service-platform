@@ -20,6 +20,7 @@ For reference, the configuration for the service in the JupyterHub's config.yaml
 | PROJECT_NAME | name of the google cloud bucket |
 | GOOGLE_APPLICATION_CREDENTIALS | path (in the container) to the Google service account key |
 | DATASTORE_DATABASE | Name of the database used to store permissions.  This must be created prior to the project. |
+| GALYLEO_ROOT_URL | Root URL of the Galyleo server |
 
 # Required Google Permissions
 The service account must have:
