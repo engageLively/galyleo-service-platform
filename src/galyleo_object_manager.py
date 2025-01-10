@@ -185,6 +185,7 @@ for table in test_tables:
     "key": table_key,
     "table_dictionary": requests.get(f'{samples_root_url}/{table}').json()
   }
+
 def _init_table_storage():
   for (name, object) in table_values.items():
     galyleo_storage.put_table("test", name, object["table_dictionary"]) 
@@ -198,5 +199,65 @@ def test_get_table():
     assert(value["table_name"] == object["key"])
     assert(value["table_dictionary"] == object["table_dictionary"])
 
+def test_table_server():
+  _init_table_storage()
+  server = GalyleoTableServer(os.environ['GALYLEO_ROOT_URL'])
+  tables = set(galyleo_storage.list_tables())
+  server_tables = set(server.servers.keys())
+  assert(tables == server_tables)
+
+
+def _get_user_and_table(path):
+  parts = path.split("/")
+  return (parts[0], parts[1])
+
+
+
+def test_delete_table():
+  _init_table_storage()
+  server = GalyleoTableServer(os.environ['GALYLEO_ROOT_URL'])
+  tables = galyleo_storage.list_tables()
+  (user, table_name) = _get_user_and_table(tables[0])
+  server.delete_table(user, table_name)
+  tables_1 = galyleo_storage.list_tables()
+  assert(tables_1 == tables[1:])
+  assert(set(tables_1) == set(server.servers.keys()))
+  (user, table_name) = _get_user_and_table(tables[1])
+  table_name_trim = table_name[:-len('.sdml')]
+  server.delete_table(user, table_name_trim)
+  tables_2 = galyleo_storage.list_tables()
+  assert(tables_2 == tables[2:])
+  assert(set(tables_2) == set(server.servers.keys()))
+
+def test_publish_table():
+  _init_table_storage()
+  tables = galyleo_storage.list_tables()
+  galyleo_storage.test_clean()
+  tables_clean = galyleo_storage.list_tables()
+  assert(len(tables_clean) == 0)
+  server = GalyleoTableServer(os.environ['GALYLEO_ROOT_URL'])
+  for (table_name, table_object) in table_values.items():
+    server.publish_table('test', table_name, table_object["table_dictionary"])
+  tables_1 = galyleo_storage.list_tables()
+  stored_tables = set([object["key"] for object in table_values.values()])
+  assert(set(tables_1) == stored_tables)
+  galyleo_storage.test_clean()
+  server = GalyleoTableServer(os.environ['GALYLEO_ROOT_URL'])
+  for (table_name, table_object) in table_values.items():
+    table_name_1 = table_name[:-len('.sdml')]
+    server.publish_table('test', table_name, table_object["table_dictionary"])
+  tables_1 = galyleo_storage.list_tables()
+  stored_tables = set([object["key"] for object in table_values.values()])
+  assert(set(tables_1) == stored_tables)
+  
+
+
+
+
+
+
 _init_table_storage()
 test_get_table()
+test_table_server()
+test_delete_table()
+test_publish_table()
