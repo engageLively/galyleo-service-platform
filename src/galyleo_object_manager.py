@@ -1,5 +1,6 @@
 from sdtp import TableServer
-from galyleo_storage import *
+from json import loads
+import galyleo_storage
 from google.cloud.exceptions import NotFound
 
 
@@ -22,10 +23,9 @@ def _get_table_(path):
   # len(parts) == 2 by the definition 
   user = parts[-2]
   raw_table = parts[-1]
-  table_dictionary = get_table(user, raw_table)
-  table_name = f'{user}/{raw_table[:-len(".sdml")]}'
+  table_dictionary = galyleo_storage.get_table(user, raw_table)
   return {
-    "table_name": table_name,
+    "table_name": path,
     "table_dictionary": table_dictionary
   }
 
@@ -43,7 +43,7 @@ class GalyleoTableServer(TableServer):
     '''
     TableServer.__init__(self)
     self.root_url = root_url
-    table_paths = list_tables()
+    table_paths = galyleo_storage.list_tables()
     for path in table_paths:
       table_data = _get_table_(path)
       self.add_sdtp_table_from_dictionary(table_data["table_name"], table_data["table_dictionary"])
@@ -62,8 +62,10 @@ class GalyleoTableServer(TableServer):
     Raises
       An InvalidDataException if the table_object is not a table dictionary
     '''
+    if not table_name.endswith('.sdml'):
+      table_name  = table_name + '.sdml'
     self.add_sdtp_table_from_dictionary(f'{user}/{table_name}', table_object)
-    put_table(user, f'{table_name}.sdml', table_object)
+    galyleo_storage.put_table(user, table_name, table_object)
 
   def delete_table(self, user, table_name):
     '''
@@ -72,18 +74,20 @@ class GalyleoTableServer(TableServer):
     and deletestores the dictionary in the repo
     Parameters:
       user: the user deleting  the table
-      table_name: name of the table (without the sdml suffix)
+      table_name: name of the table
       
     Returns
       Nothing
     Raises
       Nothing
     '''
+    if not table_name.endswith('.sdml'):
+      table_name  = table_name + '.sdml'
     full_table_name = f'{user}/{table_name}'
     if full_table_name in self.servers:
       del self.servers[full_table_name]
     try:
-      delete_table(user, f'{table_name}.sdml')
+      galyleo_storage.delete_table(user, table_name)
     except NotFound:
       pass
 
@@ -121,7 +125,7 @@ class DashboardManager:
       # then it must be a JSON form of the file
       dashboard_object = loads(dashboard_object) # will throw a JSONDecodeError if it can't decode
     if type(dashboard_object) == dict: # Should do more rigorous checking; for now we assume it's right
-      put_dashboard(user, dashboard_name, dashboard_object)
+      galyleo_storage.put_dashboard(user, dashboard_name, dashboard_object)
       return f'{self.root_url}/{user}/{dashboard_name}'
     else:
       raise ValueError(f'{repr(dashboard_object)} is not a valid dashboard')
@@ -140,7 +144,7 @@ class DashboardManager:
     '''
     if not dashboard_name.endswith('.gd.json'):
       dashboard_name = dashboard_name + '.gd.json'
-    delete_dashboard(user, dashboard_name)
+    galyleo_storage.delete_dashboard(user, dashboard_name)
 
   def list_dashboards(self, user = None):
     '''
@@ -151,7 +155,7 @@ class DashboardManager:
     Returns: 
       list of URLs of the dashboards
     '''
-    return list_dashboards(user)
+    return galyleo_storage.list_dashboards(user)
   
 #---------------------------------------------------------------------------------
 # tests
@@ -171,22 +175,22 @@ test_tables =[
 
 samples_root_url = 'https://raw.githubusercontent.com/Global-Data-Plane/sdtp-examples/refs/heads/main/simple-table-example/tables/'
 
-setup_tests()
+galyleo_storage.setup_tests()
 
 table_values = {}
 
 for table in test_tables:
-  table_key = 'test/' + table[:-len(".sdml")] # stored 
+  table_key = 'test/' + table # stored 
   table_values[table] = {
     "key": table_key,
     "table_dictionary": requests.get(f'{samples_root_url}/{table}').json()
   }
 def _init_table_storage():
   for (name, object) in table_values.items():
-    put_table("test", name, object["table_dictionary"]) 
+    galyleo_storage.put_table("test", name, object["table_dictionary"]) 
 
 def test_get_table():
-  paths = list_tables()
+  paths = galyleo_storage.list_tables()
   for path in paths:
     name = path[len("test/"):]
     value = _get_table_(path)
