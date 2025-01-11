@@ -166,8 +166,38 @@ def list_dashboards(user = '*'):
    '''
    dashboard_paths =  _all_blobs_matching_pattern(f'dashboards/{user}/*.gd.json')
    return _trim_prefix(dashboard_paths, 'dashboards/')
-   
 
+def _clean_blobs(pattern):
+  # utility used by clean_dashboards and clean_tables
+  names = _all_blobs_matching_pattern(pattern)
+  for name in names: _delete_blob(name)
+
+def clean_tables(user_pattern):
+  '''
+  Remove all the tables for all users matching user_pattern.
+  Parameters:
+     user: name of the user whose tables to remove
+  '''
+  if user_pattern is not None:
+    _clean_blobs(f'tables/{user_pattern}/*.sdml')
+
+def clean_dashboards(user_pattern):
+  '''
+  Remove all the dashboards for all users matching user_pattern.
+  Parameters:
+     user: name of the user whose dashboards to remove
+  '''
+  if user_pattern is not None:
+    _clean_blobs(f'dashboards/{user_pattern}/*.gd.json')
+   
+def clean_tables_and_dashboards(user_pattern):
+  '''
+  Clean the table and dashboards for all users matching user_pattern
+  Parameters:
+
+  '''
+  clean_dashboards(user_pattern)
+  clean_tables(user_pattern)
 #--------------------------------------------------------------------------
 # tests
 #---------------------------------------------------------------------------
@@ -184,14 +214,10 @@ def setup_tests():
 
 TEST_USER = 'test'
 
-def test_clean():
+def _test_clean(user = TEST_USER):
   # clean out all the blobs from previous tests
-  pattern = f'*/{TEST_USER}/*'
-  old_blob_names = _all_blobs_matching_pattern(pattern)
-  for blob_name in old_blob_names:
-    _delete_blob(blob_name)
-  blob_names = _all_blobs_matching_pattern(pattern)
-  assert(blob_names == [])
+  clean_tables(user)
+  clean_dashboards(user)
 
 def test_read_null():
   null = _read_blob(None)
@@ -274,7 +300,7 @@ def test_delete_dashboard():
 
 
 def test_list_tables():
-  test_clean() # get rid of any junk
+  clean_tables(TEST_USER) # get rid of any junk
   test_add_and_read_table() # to get the tables in the bucket
   tables = set(list_tables())
   expected = {f'{TEST_USER}/electoral_college.sdml', f'{TEST_USER}/electoral_college_json.sdml'}
@@ -285,7 +311,8 @@ def test_list_tables():
 
 
 def test_list_dashboards():
-  test_clean() # get rid of any junk
+  clean_dashboards(TEST_USER)# get rid of any junk
+  clean_dashboards(TEST_USER)# get rid of any junk
   test_add_and_read_dashboard() # to get the dashboards in the bucket
   dashboards = set(list_dashboards())
   expected = {f'{TEST_USER}/elections.gd.json', f'{TEST_USER}/elections_json.gd.json'}
@@ -294,16 +321,19 @@ def test_list_dashboards():
   dashboards = set(list_dashboards())
   assert(dashboards == expected)
 
-setup_tests()
-# print( os.environ['GOOGLE_APPLICATION_CREDENTIALS'])
-# test_clean()
-# test_add_table()
-# test_add_dashboard()
-# test_read_null()
-# test_write_bad_json()
-test_delete_table()
-test_delete_dashboard()
-test_clean()
-test_list_tables()
-test_list_dashboards()
-test_clean()
+def run_tests():
+  setup_tests()
+  #print( os.environ['GOOGLE_APPLICATION_CREDENTIALS'])
+  clean_tables_and_dashboards(TEST_USER)
+  test_add_and_read_table()
+  test_add_and_read_dashboard()
+  test_read_null()
+  test_write_bad_json()
+  test_delete_table()
+  test_delete_dashboard()
+  clean_tables_and_dashboards(TEST_USER)
+  test_list_tables()
+  test_list_dashboards()
+  clean_tables_and_dashboards(TEST_USER)
+
+# run_tests()

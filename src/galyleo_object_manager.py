@@ -1,5 +1,5 @@
 from sdtp import TableServer
-from json import loads
+from json import loads, dumps
 import galyleo_storage
 from google.cloud.exceptions import NotFound
 
@@ -102,7 +102,7 @@ class DashboardManager:
     Parameters:
       root_url: the root URL of the sahboard server
     '''
-    self.root_url = root_url
+    self.root_url = f'{root_url}/dashboards'
 
   def add_dashboard(self, user, dashboard_name, dashboard_object):
     '''
@@ -146,7 +146,7 @@ class DashboardManager:
       dashboard_name = dashboard_name + '.gd.json'
     galyleo_storage.delete_dashboard(user, dashboard_name)
 
-  def list_dashboards(self, user = None):
+  def list_dashboards(self, user = "*"):
     '''
     List all the dashboards under user in the repository, or, if user
     is None, all the dashboards
@@ -155,7 +155,9 @@ class DashboardManager:
     Returns: 
       list of URLs of the dashboards
     '''
-    return galyleo_storage.list_dashboards(user)
+    
+    list_from_storage = galyleo_storage.list_dashboards(user)
+    return [f'{self.root_url}/{dashboard}' for dashboard in list_from_storage]
   
 #---------------------------------------------------------------------------------
 # tests
@@ -232,7 +234,8 @@ def test_delete_table():
 def test_publish_table():
   _init_table_storage()
   tables = galyleo_storage.list_tables()
-  galyleo_storage.test_clean()
+  galyleo_storage.clean_tables(TEST_USER)
+  galyleo_storage.clean_tables(TEST_USER_1)
   tables_clean = galyleo_storage.list_tables()
   assert(len(tables_clean) == 0)
   server = GalyleoTableServer(os.environ['GALYLEO_ROOT_URL'])
@@ -241,7 +244,8 @@ def test_publish_table():
   tables_1 = galyleo_storage.list_tables()
   stored_tables = set([object["key"] for object in table_values.values()])
   assert(set(tables_1) == stored_tables)
-  galyleo_storage.test_clean()
+  galyleo_storage.clean_tables(TEST_USER)
+  galyleo_storage.clean_tables(TEST_USER_1)
   server = GalyleoTableServer(os.environ['GALYLEO_ROOT_URL'])
   for (table_name, table_object) in table_values.items():
     table_name_1 = table_name[:-len('.sdml')]
@@ -249,15 +253,116 @@ def test_publish_table():
   tables_1 = galyleo_storage.list_tables()
   stored_tables = set([object["key"] for object in table_values.values()])
   assert(set(tables_1) == stored_tables)
-  
+
+sample_dashboard_root_url =  'https://raw.githubusercontent.com/engageLively/galyleo-examples/refs/heads/main/demos/'
+
+dashboards = [
+  'nightingale/nightingale.gd.json',
+  'presidential-elections/elections-new.gd.json',
+  'seaice/seaice.gd.json',
+  'senate-elections/senate-elections.gd.json',
+  'ufos/ufos.gd.json'
+]
+
+dashboard_manager = DashboardManager(os.environ['GALYLEO_ROOT_URL'])
+
+TEST_USER = 'test'
+TEST_USER_1 = 'test1'
+
+def _make_dashboard_object(dashboard_path):
+  parts = dashboard_path.split('/')
+  return {
+    "name": parts[1],
+    "object": requests.get(f'{sample_dashboard_root_url}{dashboard_path}').json(),
+    "url": f"{os.environ['GALYLEO_ROOT_URL']}/dashboards/{TEST_USER}/{parts[1]}",
+    "url2": f"{os.environ['GALYLEO_ROOT_URL']}/dashboards/{TEST_USER_1}/{parts[1]}"
+  }
+
+dashboard_objects = [_make_dashboard_object(dashboard) for dashboard in dashboards]
+
+def test_add_dashboard():
+  galyleo_storage.clean_dashboards(TEST_USER)
+  galyleo_storage.clean_dashboards(TEST_USER_1)
+  for dashboard in dashboard_objects:
+    result = dashboard_manager.add_dashboard(TEST_USER, dashboard["name"], dashboard["object"])
+    assert(result == dashboard["url"])
+    stored  = galyleo_storage.get_dashboard(TEST_USER, dashboard["name"])
+    assert(stored == dashboard["object"])
+  names = [f"{TEST_USER}/{dashboard['name']}" for dashboard in dashboard_objects]
+  assert(set(names) == set(galyleo_storage.list_dashboards()))
+  galyleo_storage.clean_dashboards(TEST_USER)
+  galyleo_storage.clean_dashboards(TEST_USER_1)
+  for dashboard in dashboard_objects:
+    name = dashboard["name"][:-len('.gd.json')]
+    result = dashboard_manager.add_dashboard(TEST_USER, name, dashboard["object"])
+    assert(result == dashboard["url"])
+    stored  = galyleo_storage.get_dashboard(TEST_USER, dashboard["name"])
+    assert(stored == dashboard["object"])
+  names = [f"{TEST_USER}/{dashboard['name']}" for dashboard in dashboard_objects]
+  assert(set(names) == set(galyleo_storage.list_dashboards()))
+  galyleo_storage.clean_dashboards(TEST_USER)
+  galyleo_storage.clean_dashboards(TEST_USER_1)
+  for dashboard in dashboard_objects:
+    result = dashboard_manager.add_dashboard(TEST_USER, dashboard["name"], dumps(dashboard["object"]))
+    assert(result == dashboard["url"])
+    stored  = galyleo_storage.get_dashboard(TEST_USER, dashboard["name"])
+    assert(stored == dashboard["object"])
+  names = [f"{TEST_USER}/{dashboard['name']}" for dashboard in dashboard_objects]
+  assert(set(names) == set(galyleo_storage.list_dashboards()))
+  error_caught = False
+  try:
+    dashboard_manager.add_dashboard(TEST_USER, 'foo.gd.json', 'foo')
+  except ValueError:
+    error_caught = True
+  assert error_caught, "Bad dashboard error not caught"
+
+def test_delete_dashboard():
+  galyleo_storage.clean_dashboards(TEST_USER)
+  galyleo_storage.clean_dashboards(TEST_USER_1)
+  for dashboard in dashboard_objects:
+    dashboard_manager.add_dashboard(TEST_USER, dashboard["name"], dashboard["object"])
+  names = set([f"{TEST_USER}/{dashboard['name']}" for dashboard in dashboard_objects])
+  assert(set(names) == set(galyleo_storage.list_dashboards()))
+  for dashboard in dashboard_objects:
+    dashboard_manager.delete_dashboard(TEST_USER, dashboard["name"])
+    names.remove(f'{TEST_USER}/{dashboard["name"]}')
+    assert(set(names) == set(galyleo_storage.list_dashboards()))
+  error_caught = False
+  try:
+    dashboard_manager.delete_dashboard(TEST_USER, dashboard_objects[0]["name"])
+  except NotFound:
+    error_caught = True
+  assert error_caught, "Delete non-existing dashboard error not caught"
+
+def test_list_dashboards():
+  galyleo_storage.clean_dashboards(TEST_USER)
+  galyleo_storage.clean_dashboards(TEST_USER_1)
+  assert(dashboard_manager.list_dashboards() == [])
+  assert(dashboard_manager.list_dashboards(TEST_USER) == [])
+  assert(dashboard_manager.list_dashboards(TEST_USER_1) == [])
+  for dashboard in dashboard_objects:
+    dashboard_manager.add_dashboard(TEST_USER, dashboard["name"], dashboard["object"])
+    dashboard_manager.add_dashboard(TEST_USER_1, dashboard["name"], dashboard["object"])
+  urls_1 = set([dashboard["url"] for dashboard in dashboard_objects])
+  urls_2 = set([dashboard["url2"] for dashboard in dashboard_objects])
+  assert(set(dashboard_manager.list_dashboards(TEST_USER)) == urls_1)
+  assert(set(dashboard_manager.list_dashboards(TEST_USER_1)) == urls_2)
+  assert(set(dashboard_manager.list_dashboards()) == urls_2.union(urls_1))
+  galyleo_storage.clean_dashboards(TEST_USER)
+  galyleo_storage.clean_dashboards(TEST_USER_1)
 
 
 
+def run_tests():
+  galyleo_storage.clean_tables(TEST_USER)
+  galyleo_storage.clean_tables(TEST_USER_1)
+  _init_table_storage()
+  test_get_table()
+  test_table_server()
+  test_delete_table()
+  test_publish_table()
+  test_add_dashboard()
+  test_delete_dashboard()
+  test_list_dashboards()
 
-
-
-_init_table_storage()
-test_get_table()
-test_table_server()
-test_delete_table()
-test_publish_table()
+run_tests()
