@@ -5,8 +5,6 @@ from google.cloud.exceptions import NotFound
 import permissions 
 from urllib.parse import urlparse
 
-
-
 '''
 A middleware layer between the Web/REST API and the storage manager.  The objects here
 manage the storagem, retrieval, and interface to persistent objects managed
@@ -300,7 +298,7 @@ class GalyleoNotFoundException(Exception):
   def __init__(self, url):
     self.message = f'Could not find object at URL {url}'
     self.url = url
-    super.__init__(self.message)
+    super().__init__(self.message)
 
 class GalyleoNotPermittedException(Exception):
   '''
@@ -310,7 +308,7 @@ class GalyleoNotPermittedException(Exception):
     self.message = f'User {user} is not permitted to access object at {url}'
     self.url = url
     self.user = user
-    super.__init__(self.message)
+    super().__init__(self.message)
   
 class GalyleoObjectManager:
   '''
@@ -675,7 +673,7 @@ def test_delete_dashboard():
   error_caught = False
   try:
     dashboard_manager.delete_dashboard(TEST_USER, dashboard_objects[0]["name"])
-  except NotFound:
+  except GalyleoNotFoundException:
     error_caught = True
   assert error_caught, "Delete non-existing dashboard error not caught"
 
