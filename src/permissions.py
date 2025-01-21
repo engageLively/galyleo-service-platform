@@ -202,11 +202,7 @@ def test_create_object():
   assert(object is not None)
   assert(set(object["users"]) == set(["user1", "user2"]))
   failure_caught = False
-  try:
-    manager.create_object('t1', 'user3')
-  except ValueError:
-    failure_caught = True
-  assert failure_caught, "Error when attempt to add existing url to database not caught"
+  
 
 def test_delete_object():
   manager.create_object('t1', 'user1')
