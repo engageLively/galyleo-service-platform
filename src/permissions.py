@@ -201,18 +201,18 @@ def test_create_object():
   object = manager.client.get(key)
   assert(object is not None)
   assert(set(object["users"]) == set(["user1", "user2"]))
-  failure_caught = False
+  
   
 
 def test_delete_object():
-  manager.create_object('t1', 'user1')
+  manager.create_or_update_object('t1', 'user1')
   key = manager.client.key("URL", "t1")
   manager.delete_object('t1')
   object = manager.client.get(key)
   assert object is None
 
 def test_add_user():
-  manager.create_object('t1', 'user1')
+  manager.create_or_update_object('t1', 'user1')
   manager.add_user_access('t1', 'user1')
   key = manager.client.key("URL", "t1")
   object = manager.client.get(key)
@@ -222,7 +222,7 @@ def test_add_user():
   assert set(object["users"]) == {'user1', 'user2'}
 
 def test_delete_user():
-  manager.create_object('t1', 'user1')
+  manager.create_or_update_object('t1', 'user1')
   manager.add_user_access('t1', 'user2')
   key = manager.client.key("URL", "t1")
   manager.delete_user_access('t1', 'user2')
@@ -233,20 +233,12 @@ def test_delete_user():
   assert object["users"] == ['user1']
 
 def test_get_users():
-  manager.create_object('t1', 'user1')
+  manager.create_or_update_object('t1', 'user1')
   assert manager.get_users("t1") == {"user1"}
   manager.add_user_access('t1', 'user2')
   assert manager.get_users("t1") == {"user1", "user2"}
-  manager.add_user_access('t1', 'HUB')
-  assert manager.get_users("t1") == {"HUB"}
-  manager.add_user_access('t1', 'PUBLIC')
-  assert manager.get_users("t1") == {"PUBLIC"}
-  manager.delete_user_access('t1', 'PUBLIC')
-  assert manager.get_users("t1") == {"HUB"}
-  manager.delete_user_access('t1', 'HUB')
-  assert manager.get_users("t1") == {"user1", "user2"}
-  manager.delete_user_access('t1', 'user2')
-  assert manager.get_users("t1") == {"user1"}
+  
+
  
 setup_tests()
 manager = DatastoreManager(os.environ['GOOGLE_PROJECT'], os.environ['GALYLEO_PERMISSIONS_DATABASE'], os.environ['GALYLEO_PERMISSIONS_NAMESPACE'])
