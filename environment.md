@@ -17,9 +17,10 @@ For reference, the configuration for the service in the JupyterHub's config.yaml
 | JUPYTERHUB_URL |  URL for the parent Jupyter Hub |
 | GALYLEO_CLIENT_ID | 'oauth_client_id' from the config.yaml file |
 | BUCKET_NAME | name of the bucket where dashboards and tables are stored |
-| PROJECT_NAME | name of the google cloud bucket |
+| GOOGLE_PROJECT | name of the google project |
 | GOOGLE_APPLICATION_CREDENTIALS | path (in the container) to the Google service account key |
-| DATASTORE_DATABASE | Name of the database used to store permissions.  This must be created prior to the project. |
+| GALYLEO_PERMISSIONS_DATABASE | Name of the  database used to store permissions.  This must be created prior to the project. |
+| GALYLEO_PERMISSIONS_NAMESPACE | Name of the namespace within the  database used to store permissions.  This must be created prior to the project. |
 | GALYLEO_ROOT_URL | Root URL of the Galyleo server |
 
 # Required Google Permissions

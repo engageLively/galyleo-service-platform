@@ -198,6 +198,14 @@ def clean_tables_and_dashboards(user_pattern):
   '''
   clean_dashboards(user_pattern)
   clean_tables(user_pattern)
+
+def clean_all():
+  client = storage.Client()
+  blobs = client.list_blobs(os.environ['GALYLEO_STORAGE_BUCKET'])
+  for blob in blobs:
+    blob.delete()
+
+
 #--------------------------------------------------------------------------
 # tests
 #---------------------------------------------------------------------------
@@ -214,10 +222,9 @@ def setup_tests():
 
 TEST_USER = 'test'
 
-def _test_clean(user = TEST_USER):
+def _test_clean():
   # clean out all the blobs from previous tests
-  clean_tables(user)
-  clean_dashboards(user)
+  clean_all()
 
 def test_read_null():
   null = _read_blob(None)
@@ -324,7 +331,7 @@ def test_list_dashboards():
 def run_tests():
   setup_tests()
   #print( os.environ['GOOGLE_APPLICATION_CREDENTIALS'])
-  clean_tables_and_dashboards(TEST_USER)
+  clean_all()
   test_add_and_read_table()
   test_add_and_read_dashboard()
   test_read_null()
@@ -336,4 +343,4 @@ def run_tests():
   test_list_dashboards()
   clean_tables_and_dashboards(TEST_USER)
 
-# run_tests()
+run_tests()
