@@ -295,16 +295,34 @@ def test_init():
   assert set(table_server.servers.keys()) == set([object["galyleo_object"].object_key for object in table_objects])
   # check the permissions are all [owner]
   # check the data in the table matches the stored file
-test_init()
 
-# test get_object_if_permitted
-# test object_access_permitted
-# test clean_obejcts
-# test list_objests
-# test update_uer_access
-# test publish a table and dashboard
-# test deleting a table and dashboard
-# test getting table info
+def test_get_object_if_permitted():
+  pass
+def test_object_access_permitted():
+  pass
+def test_clean_objects():
+  pass
+def test_list_objects():
+  pass
+def test_update_user_access():
+  pass
+def test_publish_table_and_dashboard():
+  pass
+def test_delete_table_and_dashboard():
+  pass
+def test_get_table_info():
+  pass
+
+def run_tests():
+  test_init()
+  test_get_object_if_permitted()
+  test_object_access_permitted()
+  test_clean_objects()
+  test_list_objects()()
+  test_update_user_access()
+  test_publish_table_and_dashboard()
+  test_delete_table_and_dashboard()
+  test_get_table_info()
 
 # write a cleaner!
 
