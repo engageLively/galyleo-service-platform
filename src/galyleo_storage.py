@@ -120,7 +120,7 @@ class GalyleoStorageManager:
     Returns:
       None
     '''
-    names = self._all_blobs_matching_pattern(pattern)
+    names = self.all_blobs_matching_pattern(pattern)
     for name in names: self._delete_blob(name)
 
 
@@ -238,6 +238,8 @@ def run_tests():
   test_get_object()
   test_delete_object()
   test_all_blobs_matching_pattern()
+  manager = GalyleoStorageManager(BUCKET_NAME)
+  manager.clean_blobs('*/test*/*')
 
 run_tests()
 
