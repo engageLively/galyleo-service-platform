@@ -102,7 +102,7 @@ app = Flask(__name__)
 def _get_object_or_abort(kind, owner, name, user, user_is_hub_user):
     try:
       check_or_raise_exception(request.base_url, kind, name)
-      object = GalyleoObject(request.base_url, kind, owner, name,)
+      object = GalyleoObject(GALYLEO_ROOT_URL, kind, owner, name)
       return galyleo_object_manager.get_object_if_permitted(object, user , user_is_hub_user)
     except (GalyleoNotFoundException, GalyleoNotPermittedException, GalyleoBadObjectException) as err:
         abort(404, err.message)
