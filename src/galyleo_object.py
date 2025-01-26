@@ -41,7 +41,7 @@ class GalyleoBadObjectException(Exception):
     self.url = url
     self.reason = reason
     self.message = f'Bad object {url}: {reason}'
-    super().__init___(self.message)
+    super.__init___(self.message)
 
 def check_or_raise_exception(input, kind, name):
   '''
@@ -75,13 +75,13 @@ def make_object_from_key(object_key):
     GalyleoBadObjectException if the key is in the wrong form
   '''
   
-  parts = object_key.path.split('/')
+  parts = object_key.split('/')
   if len(parts) != 3:
     # 4, not three, because component.path always starts with a /
     raise GalyleoBadObjectException(object_key, f'Object keys must be of the form <tables or dashboards>/<owner>/<name>')
-  kind = parts[1]
-  owner = parts[2]
-  name = parts[3]
+  kind = parts[0]
+  owner = parts[1]
+  name = parts[2]
   check_or_raise_exception(object_key, kind, name)
   return GalyleoObject(kind, owner, name)
   
@@ -133,3 +133,7 @@ def test_make_object_from_key():
     assert galyleo_object.object_key == key
     galyleo_object_1 = make_object_from_key(key)
     assert galyleo_object.eq(galyleo_object_1)
+
+def run_tests():
+  test_make_object_from_url()
+  test_make_object_from_key()
