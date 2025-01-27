@@ -184,7 +184,7 @@ class GalyleoObjectManager:
     '''
     pass
   
-  def publish_object(self, galyleo_object,  object_data, share_set = {}):
+  def publish_object(self, galyleo_object,  object_data, share_set = set()):
     '''
     Put an object in the repository galyleo.object_key
     Checks that it's a dictionary that matches galyleo_object.kind or a JSON string
@@ -203,7 +203,7 @@ class GalyleoObjectManager:
     if galyleo_object.kind == 'dashboards':
       self._validate_dashboard(object_to_load)
     if galyleo_object.kind == 'tables':
-      object_to_load = self._validate_table(object_to_load)
+      self._validate_table(object_to_load)
       self.galyleo_table_server.add_sdtp_table_from_dictionary(galyleo_object.object_key, object_to_load)
     share_set.add(galyleo_object.owner)
     self.storage_manager.put_object(galyleo_object, object_to_write)
@@ -219,10 +219,13 @@ class GalyleoObjectManager:
     Raises:
       GalyleoNotFoundException if it can't find the object
     '''
-    self.storage_manager.delete_object(galyleo_object)
-    self.permissions_manager.delete_object(galyleo_object)
-    if galyleo_object.object_key in self.galyleo_table_server.servers:
-      del self.galyleo_table_server.servers[galyleo_object.object_key]
+    try:
+      self.storage_manager.delete_object(galyleo_object)
+      self.permissions_manager.delete_object(galyleo_object)
+      if galyleo_object.object_key in self.galyleo_table_server.servers:
+        del self.galyleo_table_server.servers[galyleo_object.object_key]
+    except NotFound:
+      raise GalyleoNotFoundException(f'{galyleo_object.object_key} does not exist')
 
   def clean_objects(self, kind, user_pattern = '*'):
     '''
@@ -428,16 +431,67 @@ def test_get_table_info():
   user_keys['test2'].append(galyleo_object.object_key)
   retrieved_schemas = object_manager.get_table_info('test2', True)
   assert set(retrieved_schemas.keys()) == set(user_keys['test2'])
+
+dashboard_object = {
+  'galyleo_object': GalyleoObject('dashboards', 't1_user', 'elections-formatted.gd.json'),
+  'object_data': requests.get('https://raw.githubusercontent.com/engageLively/galyleo-examples/refs/heads/main/demos/presidential-elections/elections-formatted.gd.json').json()
+}
+
+new_table_object = {
+  'galyleo_object': GalyleoObject('tables', 't1_user', table_objects[0]["galyleo_object"].name),
+  'object_data': table_objects[0]["object_data"]
+}
+
+def test_publish_table_and_dashboard():
+  clear_all()
+  object_manager = GalyleoObjectManager(PROJECT, DATABASE, NAMESPACE, BUCKET_NAME)
+  # should be nothing in the repo or table server
+  assert len(object_manager.galyleo_table_server.servers.keys()) == 0
+  for kind in ['tables', 'dashboards']:
+    assert len(object_manager.list_objects(kind, '*')) == 0
+  object_manager.publish_object(dashboard_object["galyleo_object"], dashboard_object['object_data'])
+  assert object_manager.list_objects('dashboards', '*') == [dashboard_object['galyleo_object'].object_key]
+  assert object_manager.permissions_manager.get_users(dashboard_object['galyleo_object']) == {dashboard_object['galyleo_object'].owner}
+  user_set = {'test', 'HUB'}
+  object_manager.publish_object(new_table_object["galyleo_object"], new_table_object['object_data'], user_set)
+  assert object_manager.list_objects('tables', '*') == [new_table_object['galyleo_object'].object_key]
+  assert list(object_manager.galyleo_table_server.servers.keys()) == [new_table_object['galyleo_object'].object_key]
+  user_set_1 = user_set.union({new_table_object['galyleo_object'].owner})
+  assert object_manager.permissions_manager.get_users(new_table_object['galyleo_object']) == user_set_1
+
+def _check_consistency(object_manager, object_list):
+  keys = set([galyleo_object.object_key for galyleo_object in object_list])
+  assert set(object_manager.list_objects('tables', '*')) == keys
+  assert set(object_manager.galyleo_table_server.servers.keys()) == keys
+  
+def test_delete_table_and_dashboard():
+  clear_all()
+  store_tables(BUCKET_NAME, PROJECT, DATABASE, NAMESPACE)
+  object_manager = GalyleoObjectManager(PROJECT, DATABASE, NAMESPACE, BUCKET_NAME)
+  galyleo_objects = [table_object['galyleo_object'] for table_object in table_objects]
+  _check_consistency(object_manager, galyleo_objects)
+  for i in range(len(galyleo_objects)):
+    object_manager.delete_object(galyleo_objects[i])
+    _check_consistency(object_manager, galyleo_objects[i+1:])
+  object_manager.publish_object(dashboard_object["galyleo_object"], dashboard_object['object_data'])
+  assert object_manager.list_objects('dashboards', '*') == [dashboard_object['galyleo_object'].object_key]
+  object_manager.delete_object(dashboard_object["galyleo_object"])
+  assert len(object_manager.list_objects('dashboards', '*')) == 0
+  error = False
+  try:
+    object_manager.delete_object(dashboard_object["galyleo_object"])
+  except GalyleoNotFoundException:
+    error = True
+  assert error, f"GalyleoNotFoundException not raised in attempt to delete non-existent object {dashboard_object["galyleo_object"].object_key}"
+
+
   
 
 def test_clean_objects():
   pass
 
 
-def test_publish_table_and_dashboard():
-  pass
-def test_delete_table_and_dashboard():
-  pass
+
 
 
 def run_tests():

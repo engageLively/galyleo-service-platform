@@ -52,7 +52,7 @@ class GalyleoStorageManager:
       """Deletes a blob from a GCS bucket."""
       # Initialize the client
       blob = self.bucket.blob(path)
-      if blob is None:
+      if blob is None or not blob.exists():
         raise(NotFound(path))
       blob.delete()
    
