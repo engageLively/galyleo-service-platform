@@ -328,11 +328,6 @@ def test_list_objects():
     assert set(object_manager.list_objects('dashboards', owner)) == set()
   assert set(object_manager.list_objects('tables', 'test3')) == set()
 
-  
-
-
-
-
 
 def test_object_access_permitted():
   clear_all()
