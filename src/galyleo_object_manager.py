@@ -104,10 +104,6 @@ class GalyleoObjectManager:
     '''
     object_paths = self.storage_manager.all_blobs_matching_pattern(f'{kind}/{user}/{PATTERN[kind]}')
     return object_paths
-  
-  def clean_objects(self, kind, user = '*'):
-    self.storage_manager.clean_blobs(f'{kind}/{user}/{PATTERN[kind]}')
-
 
   def object_access_permitted(self, galyleo_object, user, user_is_hub_user):
     '''
@@ -131,7 +127,7 @@ class GalyleoObjectManager:
       if galyleo_object.kind == 'dashboards':
         return self.storage_manager.get_object(galyleo_object)
       else:  # galyleo_object.kind == 'tables'
-        return self.galyleo_table_server.get_table(galyleo_object.table_name())
+        return self.galyleo_table_server.get_table(galyleo_object.object_key)
     except (NotFound, InvalidDataException):
       raise GalyleoNotFoundException(galyleo_object.object_key)
 
@@ -211,10 +207,7 @@ class GalyleoObjectManager:
       self.galyleo_table_server.add_sdtp_table_from_dictionary(galyleo_object.object_key, object_to_load)
     share_set.add(galyleo_object.owner)
     self.storage_manager.put_object(galyleo_object, object_to_write)
-
     self.permissions_manager.create_or_update_object(galyleo_object, share_set)
-    
-
     
   def delete_object(self, galyleo_object):
     '''
@@ -230,6 +223,18 @@ class GalyleoObjectManager:
     self.permissions_manager.delete_object(galyleo_object)
     if galyleo_object.object_key in self.galyleo_table_server.servers:
       del self.galyleo_table_server.servers[galyleo_object.object_key]
+
+  def clean_objects(self, kind, user_pattern = '*'):
+    '''
+    Delete all the objects of kind kind for all the users matching  user_pattern
+    Parameters:
+      kind: the kind of object to delete (must be 'dashboards' or 'tables')
+      user_pattern: a glob/regex pattern for the objects of users to delete
+    '''
+    object_keys = self.list_objects(kind, user_pattern)
+    galyleo_objects = [make_object_from_key(key) for key in object_keys]
+    for object in galyleo_objects:
+      self.delete_object(object)
 
 
   def get_table_info(self, user, user_is_hub_user):
@@ -256,54 +261,132 @@ os.environ['GALYLEO_ROOT_URL'] = 'http://test.galyleo.com'
 import requests
 
 test_tables =[
-  'electoral_college.sdml',
-  'nationwide_vote.sdml',
-  'nightingale.sdml',
-  'presidential_margins.sdml',
-  'presidential_vote.sdml',
-  'presidential_vote_history.sdml'
+  {"name": 'electoral_college.sdml', "owner":  "test"},
+  {"name": 'nationwide_vote.sdml', "owner":  "test"},
+  {"name": 'nightingale.sdml', "owner": "test"},
+  {"name": 'presidential_margins.sdml', "owner":  "test2"},
+  {"name": 'presidential_vote.sdml', "owner":  "test2"},
+  {"name": 'presidential_vote_history.sdml', "owner":  "test2"},
 ]
 
-
-# test_make_object()
 
 samples_root_url = 'https://raw.githubusercontent.com/Global-Data-Plane/sdtp-examples/refs/heads/main/simple-table-example/tables/'
 
 table_objects = [
   {
-    "galyleo_object": GalyleoObject('tables', 'test', name),
-    "object_data": requests.get(f'{samples_root_url}/{name}').json()
-  } for name in test_tables
+    "galyleo_object": GalyleoObject('tables', object['owner'], object['name']),
+    "object_data": requests.get(f'{samples_root_url}/{object["name"]}').json()
+  } for object in test_tables
 ]
 
-
-
-def store_tables(bucket_name):
+def store_tables(bucket_name, project, database, namespace):
     storage_manager = GalyleoStorageManager(bucket_name)
+    permissions_manager = permissions.DatastoreManager(project, database, namespace)
     for object in table_objects:
       storage_manager.put_object(object["galyleo_object"], object["object_data"])
+      permissions_manager.create_or_update_object(object["galyleo_object"])
 
 BUCKET_NAME='galyleo-server-test-bucket'
 PROJECT = 'galyleo-server'
 DATABASE = 'galyleo-server'
 NAMESPACE = 'test'
 
+def clear_all():
+  storage_manager = GalyleoStorageManager(BUCKET_NAME)
+  permissions_manager = permissions.DatastoreManager(PROJECT, DATABASE, NAMESPACE)
+  storage_manager.clean_all()
+  permissions_manager.clear()
+
+
 def test_init():
-  store_tables(BUCKET_NAME)
+  clear_all()
+  store_tables(BUCKET_NAME, PROJECT, DATABASE, NAMESPACE)
   object_manager = GalyleoObjectManager(PROJECT, DATABASE, NAMESPACE, BUCKET_NAME)
   table_server = object_manager.galyleo_table_server
   assert set(table_server.servers.keys()) == set([object["galyleo_object"].object_key for object in table_objects])
-  # check the permissions are all [owner]
-  # check the data in the table matches the stored file
+  for object in table_objects:
+    galyleo_object = object['galyleo_object']
+    # check the data in the table matches the stored file
+    assert table_server.get_table(galyleo_object.object_key).to_dictionary() == object['object_data']
+    # check the permissions are all [owner]
+    assert object_manager.permissions_manager.get_users(galyleo_object) == {galyleo_object.owner}
+  
+
+def test_list_objects():
+  clear_all()
+  store_tables(BUCKET_NAME, PROJECT, DATABASE, NAMESPACE)
+  object_manager = GalyleoObjectManager(PROJECT, DATABASE, NAMESPACE, BUCKET_NAME)
+  test_sets = {}
+  galyleo_objects = [table_object["galyleo_object"] for table_object in table_objects]
+  for owner in ['test', 'test2']:
+    test_sets[owner] = set([object.object_key for object in galyleo_objects if object.owner == owner])
+  all_tables = set([object.object_key for object in galyleo_objects])
+  assert set(object_manager.list_objects('tables')) == all_tables
+  assert set(object_manager.list_objects('dashboards')) == set()
+  for owner in ['test', 'test2']:
+    assert set(object_manager.list_objects('tables', owner)) == test_sets[owner]
+    assert set(object_manager.list_objects('dashboards', owner)) == set()
+  assert set(object_manager.list_objects('tables', 'test3')) == set()
+
+  
+
+
+
+
+
+def test_object_access_permitted():
+  clear_all()
+  store_tables(BUCKET_NAME, PROJECT, DATABASE, NAMESPACE)
+  object_manager = GalyleoObjectManager(PROJECT, DATABASE, NAMESPACE, BUCKET_NAME)
+  galyleo_object = table_objects[0]["galyleo_object"]
+  # make sure the owner can access
+  assert object_manager.object_access_permitted(galyleo_object, 'test', True)
+  # make sure a second user can access only if added
+  assert not object_manager.object_access_permitted(galyleo_object, 'test2', True)
+  object_manager.permissions_manager.add_user_access(galyleo_object, 'test2')
+  assert  object_manager.object_access_permitted(galyleo_object, 'test2', True)
+  assert not object_manager.object_access_permitted(galyleo_object, 'test3', True)
+  object_manager.permissions_manager.add_user_access(galyleo_object, permissions.HUB)
+  assert not object_manager.object_access_permitted(galyleo_object, 'test3', False)
+  assert object_manager.object_access_permitted(galyleo_object, 'test3', True)
+  object_manager.permissions_manager.add_user_access(galyleo_object, permissions.PUBLIC)
+  assert  object_manager.object_access_permitted(galyleo_object, 'test3', False)
+
+def successful_retrieval(galyleo_object_manager, galyleo_object, user, is_hub_user, reference_data):
+  retrieved_table = galyleo_object_manager.get_object_if_permitted(galyleo_object, user, is_hub_user)
+  assert retrieved_table.to_dictionary() == reference_data
+
+def error_not_permitted_retrieval(galyleo_object_manager, galyleo_object, user, is_hub_user):
+  error = False
+  try:
+    retrieved_table = galyleo_object_manager.get_object_if_permitted(galyleo_object, user, is_hub_user)
+  except GalyleoNotPermittedException:
+    error = True
+  assert error, f'Not Permitted Exception expected for {galyleo_object.object_key}'
+
 
 def test_get_object_if_permitted():
-  pass
-def test_object_access_permitted():
-  pass
+  clear_all()
+  store_tables(BUCKET_NAME, PROJECT, DATABASE, NAMESPACE)
+  object_manager = GalyleoObjectManager(PROJECT, DATABASE, NAMESPACE, BUCKET_NAME)
+  galyleo_object = table_objects[0]["galyleo_object"]
+  object_data = table_objects[0]["object_data"]
+  # make sure the owner can access
+  successful_retrieval(object_manager, galyleo_object, galyleo_object.owner, True, object_data)
+  # make sure a second user can access only if added
+  error_not_permitted_retrieval(object_manager, galyleo_object, 'test2', True)
+  object_manager.permissions_manager.add_user_access(galyleo_object, 'test2')
+  successful_retrieval(object_manager, galyleo_object, 'test2', True, object_data)
+  error_not_permitted_retrieval(object_manager, galyleo_object, 'test3', True)
+  object_manager.permissions_manager.add_user_access(galyleo_object, permissions.HUB)
+  error_not_permitted_retrieval(object_manager, galyleo_object, 'test3', False)
+  successful_retrieval(object_manager, galyleo_object, 'test3', True, object_data)
+  object_manager.permissions_manager.add_user_access(galyleo_object, permissions.PUBLIC)
+  successful_retrieval(object_manager, galyleo_object, 'test3', False, object_data)
+
 def test_clean_objects():
   pass
-def test_list_objects():
-  pass
+
 def test_update_user_access():
   pass
 def test_publish_table_and_dashboard():
@@ -318,12 +401,13 @@ def run_tests():
   test_get_object_if_permitted()
   test_object_access_permitted()
   test_clean_objects()
-  test_list_objects()()
+  test_list_objects()
   test_update_user_access()
   test_publish_table_and_dashboard()
   test_delete_table_and_dashboard()
   test_get_table_info()
 
+run_tests()
 # write a cleaner!
 
 
