@@ -1,4 +1,4 @@
-from flask import Flask, Response, make_response, redirect, request, session, abort,  jsonify
+from flask import Flask, Response, send_from_directory, make_response, redirect, request, session, abort,  jsonify
 from sdtp import InvalidDataException
 from sdtp  import SDML_BOOLEAN, SDML_DATE, SDML_DATETIME, SDML_NUMBER, SDML_PYTHON_TYPES, SDML_SCHEMA_TYPES, SDML_STRING, SDML_TIME_OF_DAY
 from sdtp.sdtp_table import SDMLTable, SDMLFixedTable, SDMLDataFrameTable, RowTable, RemoteSDMLTable, SDMLTableFactory, RowTableFactory, RemoteSDMLTableFactory, FileTable, FileTableFactory, GCSTable, GCSTableFactory, HTTPTable, HTTPTableFactory
@@ -7,8 +7,9 @@ import os
 from jupyterhub.services.auth import HubOAuth, HubAuth
 from functools import wraps
 from json import loads, dumps, JSONDecodeError
+from galyleo_object import GalyleoObject, make_object_from_url, make_object_from_key, check_or_raise_exception, make_object_from_url, GalyleoBadObjectException
 
-from galyleo_object_manager import make_object_from_url, check_or_raise_exception, GalyleoBadObjectException, GalyleoObject, GalyleoObjectManager, GalyleoNotFoundException, GalyleoNotPermittedException
+from galyleo_object_manager import GalyleoObjectManager, GalyleoNotFoundException, GalyleoNotPermittedException
 
 app = Flask(__name__)
 app.url_map.strict_slashes = False
@@ -24,8 +25,9 @@ GALYLEO_ROOT_URL = os.environ['GALYLEO_ROOT_URL']
 GALYLEO_PERMISSIONS_DATABASE = os.environ['GALYLEO_PERMISSIONS_DATABASE']
 GALYLEO_PERMISSIONS_NAMESPACE = os.environ['GALYLEO_PERMISSIONS_NAMESPACE']
 GOOGLE_PROJECT = os.environ['GOOGLE_PROJECT']
+BUCKET_NAME = os.environ['BUCKET_NAME']
 
-galyleo_object_manager = GalyleoObjectManager(GOOGLE_PROJECT, GALYLEO_ROOT_URL, GALYLEO_PERMISSIONS_DATABASE, GALYLEO_PERMISSIONS_NAMESPACE)
+galyleo_object_manager = GalyleoObjectManager(GOOGLE_PROJECT,GALYLEO_PERMISSIONS_DATABASE, GALYLEO_PERMISSIONS_NAMESPACE, BUCKET_NAME)
 
 auth = HubOAuth(
     api_url = HUB_API_URL,
@@ -97,28 +99,32 @@ def authenticated(f):
 
     return decorated
 
+# app = Flask(
+#   __name__,
+#   static_url_path="/services/galyleo/static",
+#   static_folder="static"
+# )
 app = Flask(__name__)
 
+@app.route("/services/galyleo/static/<path:filename>")
+def serve_static_page(filename):
+    return send_from_directory("static", filename)
+
 def _get_object_or_abort(kind, owner, name, user, user_is_hub_user):
-    try:
-      check_or_raise_exception(request.base_url, kind, name)
-      object = GalyleoObject(GALYLEO_ROOT_URL, kind, owner, name)
-      return galyleo_object_manager.get_object_if_permitted(object, user , user_is_hub_user)
-    except (GalyleoNotFoundException, GalyleoNotPermittedException, GalyleoBadObjectException) as err:
-        abort(404, err.message)
+  try:
+    check_or_raise_exception(request.base_url, kind, name)
+    object = GalyleoObject(kind, owner, name)
+    return galyleo_object_manager.get_object_if_permitted(object, user , user_is_hub_user)
+  except (GalyleoNotFoundException, GalyleoNotPermittedException, GalyleoBadObjectException) as err:
+      abort(404, err.message)
     
 
 @app.route("/services/<kind>/<owner>/<name>")
 @authenticated
 def get_object(user, kind, owner, name):
-    return jsonify(_get_object_or_abort(kind, owner, name, user, user != None))
+  return jsonify(_get_object_or_abort(kind, owner, name, user, user != None))
 
 
-@app.route("/services/galyleo/editor", methods=['GET', 'POST'])
-def show_editor():
-  """
-  Return the Galyleo editor page (probably done through JLab)
-  """
 
 def _get_parameters_json(required, optional = []):
   '''
@@ -166,7 +172,7 @@ def publish_dashboard(user):
     abort(403, "Only registered hub users can publish dashboards")
   parms = _get_parameters_json( ["name", "dashboard"], ["share_list"])
   try:
-    return galyleo_object_manager.publish_dashboard(user, parms["name"], parms["dashboard"], parms["share_list"] if parms["share_list"] else ["user"])
+    return galyleo_object_manager.publish_dashboard(user, parms["name"], parms["dashboard"], set(parms["share_list"]) if parms["share_list"] else set())
   except (ValueError, JSONDecodeError):
       abort(400, f"The dashboard parameter to {request.url} was not a valid dashboard")
 
@@ -238,21 +244,21 @@ def _get_parameters_get(required, optional = []):
         result[parm] = value
   return result
 
-def _normalize_table_name(table_name):
+def _object_from_name(table_name):
   '''
   The table name can be passed as either a full URL, OR tables/owner/name OR
-  owner/name.  Cast this into the full URL form: GALYLEO_ROOT_URL/tables/owner/name
+  owner/name.  For each of these, make the GalyleoObject and return it
   Parameters:
     table_name: the name of the table as sent
   Returns:
     The table name in the form GALYLEO_ROOT_URL/tables/owner/name
   '''
   if table_name.startswith('http'):
-     return table_name
+     return make_object_from_url(table_name)
   elif table_name.startswith('tables'):
-    return f'{GALYLEO_ROOT_URL}/{table_name}'
+    return make_object_from_key(table_name)
   else:
-    return f'{GALYLEO_ROOT_URL}/tables/{table_name}'
+    return make_object_from_key(f'tables/{table_name}')
   
 def _get_table_if_permitted(table_name, user):
   '''
@@ -268,9 +274,8 @@ def _get_table_if_permitted(table_name, user):
     the table can't be found or the table can't be accessed
   '''
   try:
-    table_name_as_url = _normalize_table_name(table_name)
-    object = make_object_from_url(table_name_as_url, GALYLEO_ROOT_URL)
-    return galyleo_object_manager.get_table(object, user, user != None)
+    object =  _object_from_name(table_name)
+    return galyleo_object_manager.object_if_permiited(object, user, user != None)
   except GalyleoBadObjectException as err:
     abort(400, err.message)
   except GalyleoNotPermittedException as err:
@@ -380,6 +385,7 @@ def get_filtered_rows(user):
       The filtered rows as a JSONified list of lists
   '''
   parms = _get_parameters_json(['table'], ['columns', 'filter'])
+  
   table = _get_table_if_permitted(parms['table'], user)
   columns = parms['columns'] if 'columns' in parms.keys() else []
   filter = parms['filter'] if 'filter' in parms.keys() else None
@@ -390,6 +396,6 @@ def get_filtered_rows(user):
     return jsonify(table.get_filtered_rows(filter, columns))
   except InvalidDataException as err:
     abort(400, f'Error {err} in get_filtered_rows')
-  
-  
-  
+
+if __name__ == '__main__':
+  app.run(host='0.0.0.0', port=8080)

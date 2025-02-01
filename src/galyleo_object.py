@@ -41,7 +41,7 @@ class GalyleoBadObjectException(Exception):
     self.url = url
     self.reason = reason
     self.message = f'Bad object {url}: {reason}'
-    super.__init___(self.message)
+    super().__init__(self.message)
 
 def check_or_raise_exception(input, kind, name):
   '''
@@ -109,31 +109,3 @@ def make_object_from_url(url, galyleo_root_url):
   return GalyleoObject(kind, owner, name)
 
 
-test_tables =[
-  'electoral_college.sdml',
-  'nationwide_vote.sdml',
-  'nightingale.sdml',
-  'presidential_margins.sdml',
-  'presidential_vote.sdml',
-  'presidential_vote_history.sdml'
-]
-
-def test_make_object_from_url():
-  for name in test_tables:
-    url = 'http://test.galyleo.com/'
-    galyleo_object = GalyleoObject('tables', 'test', name)
-    assert galyleo_object.object_key == f'tables/test/{name}'
-    galyleo_object_1 = make_object_from_url(f'{url}/tables/test/{name}', url)
-    assert galyleo_object.eq(galyleo_object_1)
-
-def test_make_object_from_key():
-  for name in test_tables:
-    galyleo_object = GalyleoObject('tables', 'test', name)
-    key = f'tables/test/{name}'
-    assert galyleo_object.object_key == key
-    galyleo_object_1 = make_object_from_key(key)
-    assert galyleo_object.eq(galyleo_object_1)
-
-def run_tests():
-  test_make_object_from_url()
-  test_make_object_from_key()
