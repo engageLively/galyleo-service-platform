@@ -27,6 +27,7 @@ GALYLEO_PERMISSIONS_NAMESPACE = os.environ['GALYLEO_PERMISSIONS_NAMESPACE']
 GOOGLE_PROJECT = os.environ['GOOGLE_PROJECT']
 BUCKET_NAME = os.environ['BUCKET_NAME']
 
+
 galyleo_object_manager = GalyleoObjectManager(GOOGLE_PROJECT,GALYLEO_PERMISSIONS_DATABASE, GALYLEO_PERMISSIONS_NAMESPACE, BUCKET_NAME)
 
 auth = HubOAuth(
@@ -52,6 +53,10 @@ def oauth_ok():
     if "text/html" in accept_header:
         return True
     return False
+
+@app.route('/services/galyleo/foo')
+def foo():
+   return 'Foo!'
     
 @app.route(OAUTH_CALLBACK_URL)
 def oauth_callback():
@@ -104,7 +109,7 @@ def authenticated(f):
 #   static_url_path="/services/galyleo/static",
 #   static_folder="static"
 # )
-app = Flask(__name__)
+
 
 @app.route("/services/galyleo/static/<path:filename>")
 def serve_static_page(filename):
@@ -118,6 +123,20 @@ def _get_object_or_abort(kind, owner, name, user, user_is_hub_user):
   except (GalyleoNotFoundException, GalyleoNotPermittedException, GalyleoBadObjectException) as err:
       abort(404, err.message)
     
+@app.route('/services/galyleo')
+def respond_to_ping():
+   '''
+   The hub pings persistently, so answer...
+   '''
+   return 'OK'
+
+@app.route("/services/galyleo/hello")
+@authenticated
+def hello(user):
+   if user is not None:
+      return f'Hello, {user}'
+   else:
+      return 'User is None'
 
 @app.route("/services/<kind>/<owner>/<name>")
 @authenticated
@@ -323,7 +342,7 @@ def _get_table_and_column(user):
 
    
 
-@app.route('/get_range_spec', methods=['GET'])
+@app.route('/services/galyleo/get_range_spec', methods=['GET'])
 @authenticated
 def get_range_spec(user):
   '''
@@ -339,7 +358,7 @@ def get_range_spec(user):
   
     
 
-@app.route('/get_all_values')
+@app.route('/services/galyleo/get_all_values')
 def get_all_values(user):
   '''
   Target for the /get_all_values route.  Makes sure that column_name and table_name are  specified in the call, then returns the
@@ -354,7 +373,7 @@ def get_all_values(user):
    
     
 
-@app.route('/get_column')
+@app.route('/services/galyleo/get_column')
 @authenticated
 def get_column(user):
   '''
@@ -370,7 +389,7 @@ def get_column(user):
 
   
     
-@app.route('/get_filtered_rows', methods=['POST'])
+@app.route('/services/galyleo/get_filtered_rows', methods=['POST'])
 @authenticated
 def get_filtered_rows(user):
   '''
@@ -398,4 +417,4 @@ def get_filtered_rows(user):
     abort(400, f'Error {err} in get_filtered_rows')
 
 if __name__ == '__main__':
-  app.run(host='0.0.0.0', port=8080)
+  app.run(host='0.0.0.0', port=9999)

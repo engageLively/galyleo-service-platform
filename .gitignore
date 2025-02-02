@@ -173,3 +173,4 @@ cython_debug/
 # authentication keys
 .keys/
 Pipfile
+set_vars.bat
