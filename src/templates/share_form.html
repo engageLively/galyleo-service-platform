@@ -5,20 +5,45 @@
     <style type="text/css">
         .important { color: #336699; }
     </style>
+    <script>
+      function collectSelectedUsers() {
+        event.preventDefault();
+        const checkedValues = Array.from(document.querySelectorAll('input[name="users"]:checked'))
+                                       .map(checkbox => checkbox.value);
+        const form = document.getElementById("shareForm");
+        const user_list = document.getElementById("userList");
+        user_list.value = JSON.stringify(checkedValues);
+        form.submit()
+      }
+     
+    </script>
 {% endblock %}
 {% block content %}
-    <fieldset>
-      <legend>Read permissions for {{ object_name }}</legend>
-      {% for user in users %}
-        <div>
-          {% if user["permitted"] %}
-            <input type="checkbox" id="{{ user['name'] }}" name="{{ user['name'] }}" checked/>
-          {% else %}
-            <input type="checkbox" id="{{ user['name'] }}" name="{{ user['name'] }}" />
-          {% endif %}
-          <label for="{{ user['name'] }}">{{ user['name'] }}</label>
-        </div>
-      {% endfor %}
-    </fieldset>
+    <form id="shareForm" action="/services/galyleo/share_object" method="post" onsubmit="collectSelectedUsers()">
+      <fieldset>
+        <input type="hidden" name="prev_page" id="prevPage" value="{{ prev_page }}"/>
+        <input type="hidden" name="user_list" id="userList"/>
+        <input type="hidden" name="object_name" value="{{ object_name }}" />
+        <fieldset>
+          <legend>Read permissions for {{ object_name }}</legend>
+          {% for user in users %}
+            <div>
+              <label>
+                {% if user["permitted"] %}
+                  <input type="checkbox" name="users" value="{{ user['name'] }}" checked/>
+                {% else %}
+                  <input type="checkbox" name="users" value="{{ user['name'] }}" />
+                {% endif %}
+                {{ user['name'] }}
+              </label>
+            </div>
+          {% endfor %}
+        </fieldset>
+        <button type="submit">Share</button>
+      </form>
+      <br>
+      <a href="{{ prev_page }}">Cancel</button></a>
+  
+    
 {% endblock %}
 

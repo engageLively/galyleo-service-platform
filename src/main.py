@@ -571,19 +571,33 @@ def view_table(user):
   table = galyleo_object_manager.get_object_if_permitted(galyleo_object, email, email is not None)
   return render_template('view_table.html', navbar_contents = _gen_navbar('view_tables', email), email=email, table_name=table_name,  schema = table.schema)
 
+@app.route('/services/galyleo/share_object', methods=['POST'])
+@authenticated
+def share_object(user):
+  email = _get_email(user)
+  object_name = request.form.get('object_name')
+  selected_users = loads(request.form.get('user_list'))
+  galyleo_object = make_object_from_key(object_name)
+  galyleo_object_manager.update_user_access(galyleo_object, set(selected_users))
+  prev_page = request.form.get('prev_page')
+  # return jsonify({'email': email, 'object_name': object_name, 'selected_users': selected_users})
+  return redirect(prev_page)
+
+
+
 def _hub_users():
   response = requests.get(f'{HUB_API_URL}/users', headers={"Authorization": f"token {JUPYTER_HUB_API_TOKEN}"})
   user_list = response.json()
   return [user["name"] for user in user_list] + [permissions.HUB, permissions.PUBLIC]
 
-def _show_share_form(galyleo_object, email, name):
+def _show_share_form(galyleo_object, email, name, prev_page):
   if email != galyleo_object.owner:
     flash(f'Only {galyleo_object.owner} can change the sharing of {name}, not {email}')
     return redirect('/services/galyleo/greeting')
   users = set(_hub_users()) - {email} # sharing permissions on the owner can't be changed
   allowed_users = galyleo_object_manager.permissions_manager.get_users(galyleo_object)
   user_struct_list = [{"name": user, "permitted": user in allowed_users} for user in users]
-  return render_template("share_form.html", navbar_contents = _gen_navbar('', email), email=email, object_name=name,  users = user_struct_list)
+  return render_template("share_form.html", navbar_contents = _gen_navbar('', email), email=email, object_name=name,  users = user_struct_list, prev_page = prev_page)
    
 
 @app.route('/services/galyleo/share_table')
@@ -591,7 +605,7 @@ def _show_share_form(galyleo_object, email, name):
 def show_share_table_form(user):
   table_name = request.args['table']
   email = _get_email(user)
-  return _show_share_form(make_object_from_key(table_name), email, table_name)
+  return _show_share_form(make_object_from_key(table_name), email, table_name, f'{HUB_URL}/services/galyleo/view_tables')
  
 
 
