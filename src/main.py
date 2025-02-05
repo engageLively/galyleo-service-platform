@@ -1,4 +1,4 @@
-from flask import Flask, Response, send_from_directory, make_response, redirect, request, session, abort,  jsonify
+from flask import Flask, Response, send_from_directory, make_response, redirect, request, session, abort,  jsonify, render_template, flash
 from sdtp import InvalidDataException
 from sdtp  import SDML_BOOLEAN, SDML_DATE, SDML_DATETIME, SDML_NUMBER, SDML_PYTHON_TYPES, SDML_SCHEMA_TYPES, SDML_STRING, SDML_TIME_OF_DAY
 from sdtp.sdtp_table import SDMLTable, SDMLFixedTable, SDMLDataFrameTable, RowTable, RemoteSDMLTable, SDMLTableFactory, RowTableFactory, RemoteSDMLTableFactory, FileTable, FileTableFactory, GCSTable, GCSTableFactory, HTTPTable, HTTPTableFactory
@@ -11,10 +11,9 @@ from galyleo_object import GalyleoObject, make_object_from_url, make_object_from
 
 from galyleo_object_manager import GalyleoObjectManager, GalyleoNotFoundException, GalyleoNotPermittedException
 
-app = Flask(__name__)
-app.url_map.strict_slashes = False
 
-app.secret_key = os.environ['GALYLEO_SECRET_KEY']  # must agree with the secret key  for Galyleo in the hub's config.yaml
+
+  # must agree with the secret key  for Galyleo in the hub's config.yaml
 
 HUB_API_URL = os.environ['JUPYTERHUB_API_URL']
 SERVICE_API_TOKEN =  os.environ['GALYLEO_SERVICE_API_TOKEN'] # must agree with the service API token for Galyleo in the hub's config.yaml
@@ -27,6 +26,9 @@ GALYLEO_PERMISSIONS_NAMESPACE = os.environ['GALYLEO_PERMISSIONS_NAMESPACE']
 GOOGLE_PROJECT = os.environ['GOOGLE_PROJECT']
 BUCKET_NAME = os.environ['BUCKET_NAME']
 
+app = Flask(__name__, static_url_path = '/services/galyleo/static')
+app.url_map.strict_slashes = False
+app.secret_key = os.environ['GALYLEO_SECRET_KEY']
 
 galyleo_object_manager = GalyleoObjectManager(GOOGLE_PROJECT,GALYLEO_PERMISSIONS_DATABASE, GALYLEO_PERMISSIONS_NAMESPACE, BUCKET_NAME)
 
@@ -125,16 +127,24 @@ def _get_object_or_abort(kind, owner, name, user, user_is_hub_user):
     
 @app.route('/services/galyleo')
 def respond_to_ping():
-   '''
-   The hub pings persistently, so answer...
-   '''
-   return 'OK'
+  '''
+  The hub pings persistently, so answer...
+  '''
+  return 'OK'
+
+@app.route('/services/galyleo/data')
+@authenticated
+def render_greeting(user):
+  email = user['name'] if user is not None and 'name' in user else None
+  routes = ['foo', 'bar', 'baz']
+  additional_routes = ['foo1', 'bar1', 'baz1']
+  return render_template('greeting.html', email = email, routes = routes, additional_routes = additional_routes)
 
 @app.route("/services/galyleo/hello")
 @authenticated
 def hello(user):
    if user is not None:
-      return f'Hello, {user}'
+      return f'Hello, {user['name']}'
    else:
       return 'User is None'
 
@@ -195,6 +205,7 @@ def publish_dashboard(user):
   except (ValueError, JSONDecodeError):
       abort(400, f"The dashboard parameter to {request.url} was not a valid dashboard")
 
+  
 @app.route("/services/galyleo/publish_data",  methods=['POST'])
 @authenticated
 def publish_dataset(user):
@@ -415,6 +426,115 @@ def get_filtered_rows(user):
     return jsonify(table.get_filtered_rows(filter, columns))
   except InvalidDataException as err:
     abort(400, f'Error {err} in get_filtered_rows')
+
+#------------------------------------UI Methods--------------------#
+def _gen_navbar(active, email = None):
+  def gen_link(link, active):
+    class_val = 'active' if link[1] == active else 'inactive'
+    return {"link": f"/services/galyleo/{link[1]}", "text": link[0], "class": class_val}
+  
+  base_links = [
+    ('Home', 'greeting'),
+    ('View Tables', 'view_tables'),
+    ('View Dashboards', 'view_dashboards')
+  ]
+  unloggedin_links = [
+    ('Login', 'login')
+  ]
+  loggedin_links = [
+    ('Upload Table', 'show_upload_data_form'),
+    ('Upload Dashboard', 'upload_dashboard')
+  ]
+
+  links = base_links + (unloggedin_links if email is None else loggedin_links)
+  result  = [gen_link(link, active) for link in links]
+  return result
+
+@app.route('/services/galyleo/greeting')
+@authenticated
+def show_home(user):
+  email = user['name']
+  return render_template('greeting.html', navbar_contents = _gen_navbar('greeting', email), email=email)
+   
+
+@app.route("/services/galyleo/show_upload_data_form")
+@authenticated
+def show_upload_data_form(user):
+  if user is None:
+     flash("Must be logged in to upload tables")
+     return redirect('/services/galyleo/greetiung')
+
+  tables = galyleo_object_manager.list_objects('tables', user)
+  email = user['name']
+  return  render_template('upload_form.html',  navbar_contents = _gen_navbar('show_upload_data_form', email), email=email, user_tables=tables)
+  
+
+
+# @app.route("/services/galyleo/upload_table",  methods=['POST'])
+# @authenticated
+# def upload_data_file(user):
+#   """
+#   takes three arguments:
+#   1. .sdml file to publish (a JSON string)
+#   2. name of the dataset
+#   3. public -- a boolean which says this is hub users only/public
+#   Uses OAuth authentication from the Hub or a bearer token
+#   """
+#   if user is None:
+#     flash('Only registered users can upload data tables')
+#     return redirect('/services/galyleo/home')
+  
+#   parms = _get_parameters_json(["name", "table"], ["share_list"])
+#   try:
+#     return galyleo_object_manager.publish_table(user, parms["name"], parms["table"], parms["share_list"] if parms["share_list"] else ["user"])
+#   except (ValueError, JSONDecodeError):
+#       abort(400, f"The dashboard parameter to {request.url} was not a valid table")
+
+def _get_accessible_objects(kind, email):
+  paths = galyleo_object_manager.list_objects(kind)
+  result = {
+    "user": [],
+    "other": []
+  }
+  for path in paths:
+    galyleo_object = make_object_from_key(path)
+    if email and galyleo_object.owner == email:
+      result["user"].append(path)
+    elif galyleo_object_manager.object_access_permitted(galyleo_object, email):
+      result["other"].append(path)
+  return result
+
+
+@app.route('/services/galyleo/view_tables')
+@authenticated
+def view_tables(user):
+   email = user['name'] if user else None
+   tables = _get_accessible_objects('tables', email)
+   return render_template('view_tables.html', navbar_contents = _gen_navbar('view_tables', email), email=email, tables=tables)
+
+@app.route('/services/galyleo/view_dashboards')
+@authenticated
+def view_dashboards(user):
+  pass
+
+@app.route('/services/galyleo/login')
+@authenticated
+def login(user):
+  pass
+
+@app.route('/services/galyleo/upload_table', methods=['POST'])
+@authenticated
+def upload_table(user):
+  file_object = request.files['file']
+  data = file_object.read().decode('utf-8')
+  galyleo_object = GalyleoObject('tables', user['name'], request.files['file'].filename)
+  galyleo_object_manager.publish_object(galyleo_object, data)
+  return redirect('/services/galyleo/greeting')
+
+@app.route('/services/galyleo/upload_dashboard')
+@authenticated
+def show_upload_dashboard_form(user):
+  pass
 
 if __name__ == '__main__':
   app.run(host='0.0.0.0', port=9999)

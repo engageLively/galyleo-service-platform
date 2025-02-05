@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Tables{% endblock %}
+{% block head %}
+    {{ super() }}
+    <style type="text/css">
+        .important { color: #336699; }
+    </style>
+{% endblock %}
+{% block content %}
+    <h1>Galyleo Data Plaform  Tables</h1>
+    <table class="object-table">
+        <caption>Tables owned by {{ email }}</caption>
+        {% for table in tables["user"] %}
+            <tr>
+                <td>
+                    <a href="/services/galyleo/view_table?table={{ table }}">View {{ table }}</a>
+                </td>
+                <td>
+                    <a href="/services/galyleo/share_table?table={{ table }}">Share {{ table }}</a>
+                </td>
+                <td>
+                    <a href="/services/galyleo/delete_table?table={{ table }}">Delete {{ table }}</a>
+                </td>
+            </tr>
+            
+        {%  endfor %}
+       
+    </table>
+    <h2>Other Tables</h2>
+        {% for table in tables["other"] %}
+            <a href="/services/galyleo/view_table?table={{ table }}">{{ table }}</a><br>
+        {%  endfor %}
+    
+{% endblock %}
+
