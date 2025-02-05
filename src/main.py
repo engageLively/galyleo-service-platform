@@ -1,4 +1,5 @@
 from flask import Flask, Response, send_from_directory, make_response, redirect, request, session, abort,  jsonify, render_template, flash
+import requests
 from sdtp import InvalidDataException
 from sdtp  import SDML_BOOLEAN, SDML_DATE, SDML_DATETIME, SDML_NUMBER, SDML_PYTHON_TYPES, SDML_SCHEMA_TYPES, SDML_STRING, SDML_TIME_OF_DAY
 from sdtp.sdtp_table import SDMLTable, SDMLFixedTable, SDMLDataFrameTable, RowTable, RemoteSDMLTable, SDMLTableFactory, RowTableFactory, RemoteSDMLTableFactory, FileTable, FileTableFactory, GCSTable, GCSTableFactory, HTTPTable, HTTPTableFactory
@@ -8,6 +9,7 @@ from jupyterhub.services.auth import HubOAuth, HubAuth
 from functools import wraps
 from json import loads, dumps, JSONDecodeError
 from galyleo_object import GalyleoObject, make_object_from_url, make_object_from_key, check_or_raise_exception, make_object_from_url, GalyleoBadObjectException
+import permissions
 
 from galyleo_object_manager import GalyleoObjectManager, GalyleoNotFoundException, GalyleoNotPermittedException
 
@@ -25,6 +27,7 @@ GALYLEO_PERMISSIONS_DATABASE = os.environ['GALYLEO_PERMISSIONS_DATABASE']
 GALYLEO_PERMISSIONS_NAMESPACE = os.environ['GALYLEO_PERMISSIONS_NAMESPACE']
 GOOGLE_PROJECT = os.environ['GOOGLE_PROJECT']
 BUCKET_NAME = os.environ['BUCKET_NAME']
+JUPYTER_HUB_API_TOKEN = os.environ['JUPYTER_HUB_API_TOKEN']
 
 app = Flask(__name__, static_url_path = '/services/galyleo/static')
 app.url_map.strict_slashes = False
@@ -428,6 +431,12 @@ def get_filtered_rows(user):
     abort(400, f'Error {err} in get_filtered_rows')
 
 #------------------------------------UI Methods--------------------#
+def _get_email(user):
+  try:
+    return user['name']
+  except Exception:
+    return None
+  
 def _gen_navbar(active, email = None):
   def gen_link(link, active):
     class_val = 'active' if link[1] == active else 'inactive'
@@ -535,6 +544,39 @@ def upload_table(user):
 @authenticated
 def show_upload_dashboard_form(user):
   pass
+
+@app.route('/services/galyleo/view_table')
+@authenticated
+def view_table(user):
+  email = user['name'] if user and type(user) == dict else None
+  table_name = request.args.get('table')
+  galyleo_object = make_object_from_key(table_name)
+  table = galyleo_object_manager.get_object_if_permitted(galyleo_object, email, email is not None)
+  return render_template('view_table.html', navbar_contents = _gen_navbar('view_tables', email), email=email, table_name=table_name,  schema = table.schema)
+
+def _hub_users():
+  response = requests.get(f'{HUB_API_URL}/users', headers={"Authorization": f"token {JUPYTER_HUB_API_TOKEN}"})
+  user_list = response.json()
+  return [user["name"] for user in user_list] + [permissions.HUB, permissions.PUBLIC]
+
+def _show_share_form(galyleo_object, email, name):
+  if email != galyleo_object.owner:
+    flash(f'Only {galyleo_object.owner} can change the sharing of {name}, not {email}')
+    return redirect('/services/galyleo/greeting')
+  users = set(_hub_users()) - {email} # sharing permissions on the owner can't be changed
+  allowed_users = galyleo_object_manager.permissions_manager.get_users(galyleo_object)
+  user_struct_list = [{"name": user, "permitted": user in allowed_users} for user in users]
+  return render_template("share_form.html", navbar_contents = _gen_navbar('', email), email=email, object_name=name,  users = user_struct_list)
+   
+
+@app.route('/services/galyleo/share_table')
+@authenticated
+def show_share_table_form(user):
+  table_name = request.args['table']
+  email = _get_email(user)
+  return _show_share_form(make_object_from_key(table_name), email, table_name)
+ 
+
 
 if __name__ == '__main__':
   app.run(host='0.0.0.0', port=9999)
