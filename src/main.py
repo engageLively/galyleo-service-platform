@@ -540,6 +540,23 @@ def upload_table(user):
   galyleo_object_manager.publish_object(galyleo_object, data)
   return redirect('/services/galyleo/greeting')
 
+def _delete_object(email, next_page):
+  object_name = request.args.get('name')
+  galyleo_object = make_object_from_key(object_name)
+  if galyleo_object.owner == email:
+    try:
+      galyleo_object_manager.delete_object(galyleo_object)
+    except Exception as error:
+      flash(error.message)
+  else:
+     flash(f'Only {galyleo_object.owner}')
+  return redirect(next_page)
+    
+@app.route('/services/galyleo/delete_table')
+@authenticated
+def delete_table(user):
+  _delete_object(_get_email(user), '/services/galyleo/view_tables')
+
 @app.route('/services/galyleo/upload_dashboard')
 @authenticated
 def show_upload_dashboard_form(user):

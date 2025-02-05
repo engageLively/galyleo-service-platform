@@ -5,6 +5,22 @@
     <style type="text/css">
         .important { color: #336699; }
     </style>
+    <script>
+        function confirmAndDelete(table_name) {
+            if (confirm(`Are you sure you want to delete ${table_name}?`)) {
+              // User clicked OK, make an AJAX request to the server
+              // Example using Fetch API:
+              fetch(`/services/galyleo/delete_table?name=${table_name}`)
+              .then(response => {
+                // Handle the server's response
+              })
+              .catch(error => {
+                // Handle any errors
+              });
+            }
+          }
+
+    </script>
 {% endblock %}
 {% block content %}
     <h1>Galyleo Data Plaform Tables</h1>
@@ -19,7 +35,9 @@
                     <a href="/services/galyleo/share_table?table={{ table }}">Share {{ table }}</a>
                 </td>
                 <td>
-                    <a href="/services/galyleo/delete_table?table={{ table }}">Delete {{ table }}</a>
+                    {% set table_string = "'" + table + "'" %}
+                    {% set call = '"confirmAndDelete(' + table_string  + ');"' %}
+                    <button onclick="confirmAndDelete('{{ table }}')">Delete {{ table }}</button>
                 </td>
             </tr>
             
@@ -32,4 +50,3 @@
         {%  endfor %}
     
 {% endblock %}
-
