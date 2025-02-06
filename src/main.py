@@ -610,4 +610,4 @@ def show_share_table_form(user):
 
 
 if __name__ == '__main__':
-  app.run(host='0.0.0.0', port=9999)
+  app.run(host='0.0.0.0', port=os.getenv('GALYLEO_PORT', 9999))

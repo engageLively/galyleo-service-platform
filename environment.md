@@ -23,6 +23,7 @@ For reference, the configuration for the service in the JupyterHub's config.yaml
 | GALYLEO_PERMISSIONS_DATABASE | Name of the  database used to store permissions.  This must be created prior to the project. |
 | GALYLEO_PERMISSIONS_NAMESPACE | Name of the namespace within the  database used to store permissions.  This must be created prior to the project. |
 | GALYLEO_ROOT_URL | Root URL of the Galyleo server |
+| GALYLEO_PORT | Port for the Galyleo service |
 
 # Required Google Permissions
 The service account must have:
