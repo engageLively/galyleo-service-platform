@@ -2,8 +2,9 @@ runtime: python312
 
 instance_class: F2
 
+# entrypoint: gunicorn -b :$PORT main:app
+
 env_variables:
-  GOOGLE_APPLICATION_CREDENTIALS:   "/workspace/galyleo-service.keys/galyleo-server-1105bf54b967.json"
   JUPYTERHUB_API_URL:   "https:/galyleojupyter-beta.engagelively.com/hub/api"
   JUPYTER_HUB_API_TOKEN:   "bce4e024f2334725b8723db758aa5948"
   JUPYTERHUB_URL:   "https:/galyleojupyter-beta.engagelively.com"
@@ -12,7 +13,12 @@ env_variables:
   GALYLEO_ROOT_URL:   "https:/galyleojupyter-beta.engagelively.com/services/galyleo"
   GALYLEO_PERMISSIONS_DATABASE:   "galyleo-server"
   GALYLEO_PERMISSIONS_NAMESPACE:   "galyleo-server"
-  GOOGLE_PROJECT:   "galyleo-server"
-  BUCKET_NAME:   "galyleo-server-test-bucket"
+  GOOGLE_PROJECT:   "galyleo-server-2"
+  BUCKET_NAME:   "galyleo-server-2-test-bucket"
   GALYLEO_SECRET_KEY:   "02486733472136175476809643230687"
-  GALYLEO_PORT: 8080
+
+
+handlers:
+  - url: /.*
+    redirect_http_response_code: 301
+    script: auto

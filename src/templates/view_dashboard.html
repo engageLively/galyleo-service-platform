@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Galyleo Dashboard{ dashboard_name }} {% endblock %}
+{% block head %}
+    {{ super() }}
+    <style type="text/css">
+        .type { color: #336699; font-family: monospace}
+    </style>
+{% endblock %}
+{% block content %}
+
+  <h1>Galyleo Dashboard<span style = "display: block;"></span>{{ dashboard_name }}<span style = "display: block;"></span> </h1>
+  {{ dashboard }}
+  
+{% endblock %}

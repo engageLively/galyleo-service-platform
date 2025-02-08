@@ -115,10 +115,15 @@ def authenticated(f):
 #   static_folder="static"
 # )
 
+def _get_email(user):
+  try:
+    return user['name']
+  except Exception:
+    return None
 
 @app.route("/services/galyleo/static/<path:filename>")
 def serve_static_page(filename):
-    return send_from_directory("static", filename)
+  return send_from_directory("static", filename)
 
 def _get_object_or_abort(kind, owner, name, user, user_is_hub_user):
   try:
@@ -430,12 +435,21 @@ def get_filtered_rows(user):
   except InvalidDataException as err:
     abort(400, f'Error {err} in get_filtered_rows')
 
-#------------------------------------UI Methods--------------------#
-def _get_email(user):
+@app.route("/services/galyleo/dashboards/<owner>/<dashboard>")
+@authenticated
+def get_dashboard(user, owner, dashboard):
+  email = user['name'] if user and type(user) == dict else None
+  galyleo_object = GalyleoObject('dashboards', owner, dashboard)
   try:
-    return user['name']
-  except Exception:
-    return None
+    dashboard_object = galyleo_object_manager.get_object_if_permitted(galyleo_object, email, email is not None)
+    return jsonify(dashboard_object)
+  except GalyleoNotPermittedException as err:
+    abort(403, err.message)
+  except GalyleoNotFoundException as err:
+    abort(404, err.message)
+
+#------------------------------------UI Methods--------------------#
+
   
 def _gen_navbar(active, email = None):
   def gen_link(link, active):
@@ -452,7 +466,7 @@ def _gen_navbar(active, email = None):
   ]
   loggedin_links = [
     ('Upload Table', 'show_upload_data_form'),
-    ('Upload Dashboard', 'upload_dashboard')
+    ('Upload Dashboard', 'show_upload_dashboard_form')
   ]
 
   links = base_links + (unloggedin_links if email is None else loggedin_links)
@@ -471,33 +485,21 @@ def show_home(user):
 def show_upload_data_form(user):
   if user is None:
      flash("Must be logged in to upload tables")
-     return redirect('/services/galyleo/greetiung')
-
+     return redirect('/services/galyleo/greeting')
   tables = galyleo_object_manager.list_objects('tables', user)
   email = user['name']
-  return  render_template('upload_form.html',  navbar_contents = _gen_navbar('show_upload_data_form', email), email=email, user_tables=tables)
-  
+  return  render_template('upload_data_form.html',  navbar_contents = _gen_navbar('show_upload_data_form', email), email=email, user_tables=tables)
 
-
-# @app.route("/services/galyleo/upload_table",  methods=['POST'])
-# @authenticated
-# def upload_data_file(user):
-#   """
-#   takes three arguments:
-#   1. .sdml file to publish (a JSON string)
-#   2. name of the dataset
-#   3. public -- a boolean which says this is hub users only/public
-#   Uses OAuth authentication from the Hub or a bearer token
-#   """
-#   if user is None:
-#     flash('Only registered users can upload data tables')
-#     return redirect('/services/galyleo/home')
+@app.route("/services/galyleo/show_upload_dashboard_form")
+@authenticated
+def show_upload_dashboard_form(user):
+  if user is None:
+     flash("Must be logged in to upload dashboards")
+     return redirect('/services/galyleo/greeting')
+  email = user['name']
+  dashboards = galyleo_object_manager.list_objects('dashboards', email)
+  return  render_template('upload_dashboard_form.html',  navbar_contents = _gen_navbar('show_upload_data_form', email), email=email, user_dashboard= dashboards)
   
-#   parms = _get_parameters_json(["name", "table"], ["share_list"])
-#   try:
-#     return galyleo_object_manager.publish_table(user, parms["name"], parms["table"], parms["share_list"] if parms["share_list"] else ["user"])
-#   except (ValueError, JSONDecodeError):
-#       abort(400, f"The dashboard parameter to {request.url} was not a valid table")
 
 def _get_accessible_objects(kind, email):
   paths = galyleo_object_manager.list_objects(kind)
@@ -524,21 +526,33 @@ def view_tables(user):
 @app.route('/services/galyleo/view_dashboards')
 @authenticated
 def view_dashboards(user):
-  pass
+  email = user['name'] if user else None
+  dashboards = _get_accessible_objects('dashboards', email)
+  return render_template('view_dashboards.html', navbar_contents = _gen_navbar('view_dashboards', email), email=email, dashboards=dashboards)
 
 @app.route('/services/galyleo/login')
 @authenticated
 def login(user):
   pass
 
+def _upload_object(kind, user, next_page):
+  owner = _get_email(user)
+  file_object = request.files['file']
+  data = file_object.read().decode('utf-8')
+  galyleo_object = GalyleoObject(kind, owner, file_object.filename)
+  galyleo_object_manager.publish_object(galyleo_object, data)
+  return redirect(next_page)
+
 @app.route('/services/galyleo/upload_table', methods=['POST'])
 @authenticated
 def upload_table(user):
-  file_object = request.files['file']
-  data = file_object.read().decode('utf-8')
-  galyleo_object = GalyleoObject('tables', user['name'], request.files['file'].filename)
-  galyleo_object_manager.publish_object(galyleo_object, data)
-  return redirect('/services/galyleo/greeting')
+  return _upload_object('tables', user, '/services/galyleo/view_tables')
+
+
+@app.route('/services/galyleo/upload_dashboard', methods=['POST'])
+@authenticated
+def upload_dashboard(user):
+  return _upload_object('dashboards', user, '/services/galyleo/view_dashboards')
 
 def _delete_object(email, next_page):
   object_name = request.args.get('name')
@@ -557,19 +571,45 @@ def _delete_object(email, next_page):
 def delete_table(user):
   _delete_object(_get_email(user), '/services/galyleo/view_tables')
 
-@app.route('/services/galyleo/upload_dashboard')
-@authenticated
-def show_upload_dashboard_form(user):
-  pass
+
+
+def _get_object_if_permitted(name, email):
+  galyleo_object = make_object_from_key(name)
+  return galyleo_object_manager.get_object_if_permitted(galyleo_object, email, email is not None)
+
 
 @app.route('/services/galyleo/view_table')
 @authenticated
 def view_table(user):
   email = user['name'] if user and type(user) == dict else None
   table_name = request.args.get('table')
-  galyleo_object = make_object_from_key(table_name)
-  table = galyleo_object_manager.get_object_if_permitted(galyleo_object, email, email is not None)
+  table = _get_object_if_permitted(table_name, email)
   return render_template('view_table.html', navbar_contents = _gen_navbar('view_tables', email), email=email, table_name=table_name,  schema = table.schema)
+
+@app.route("/services/galyleo/view_dashboard_as_json")
+@authenticated
+def view_dashboard_as_json(user):
+  email = user['name'] if user and type(user) == dict else None
+  dashboard = request.args.get('dashboard')
+  galyleo_object = make_object_from_key(dashboard)
+  try:
+    dashboard_object = galyleo_object_manager.get_object_if_permitted(galyleo_object, email, email is not None)
+    return render_template('view_dashboard.html', navbar_contents = _gen_navbar('view_dashboard', email), email=email, dashboard_name=dashboard,  dashboard = dashboard_object)
+  except(GalyleoNotPermittedException, GalyleoNotFoundException) as err:
+    flash(err.message)
+    return redirect('/services/galyleo/view_dashboards')
+
+@app.route('/services/galyleo/view_dashboard')
+@authenticated
+def view_dashboard(user):
+  email = user['name'] if user and type(user) == dict else None
+  dashboard_name = request.args.get('dashboard')
+  galyleo_object = make_object_from_key(dashboard_name)
+  if galyleo_object_manager.object_access_permitted(galyleo_object, email, email is not None):
+    return redirect(f'/services/galyleo/static/published/index.html?dashboard={HUB_URL}/services/galyleo/{dashboard_name}') 
+  else:
+    flash(f'User {email} does not have permission to access {dashboard_name}')
+    return redirect('/services/galyleo/view_dashboards')
 
 @app.route('/services/galyleo/share_object', methods=['POST'])
 @authenticated
@@ -590,24 +630,30 @@ def _hub_users():
   user_list = response.json()
   return [user["name"] for user in user_list] + [permissions.HUB, permissions.PUBLIC]
 
-def _show_share_form(galyleo_object, email, name, prev_page):
+def _show_share_form(user, next_url):
+  name = request.args['name']
+  email = _get_email(user)
+  galyleo_object = make_object_from_key(name)
   if email != galyleo_object.owner:
     flash(f'Only {galyleo_object.owner} can change the sharing of {name}, not {email}')
     return redirect('/services/galyleo/greeting')
   users = set(_hub_users()) - {email} # sharing permissions on the owner can't be changed
   allowed_users = galyleo_object_manager.permissions_manager.get_users(galyleo_object)
   user_struct_list = [{"name": user, "permitted": user in allowed_users} for user in users]
-  return render_template("share_form.html", navbar_contents = _gen_navbar('', email), email=email, object_name=name,  users = user_struct_list, prev_page = prev_page)
+  return render_template("share_form.html", navbar_contents = _gen_navbar('', email), email=email, object_name=name,  users = user_struct_list, prev_page = f'{HUB_URL}/services/galyleo/{next_url}')
    
+  
 
 @app.route('/services/galyleo/share_table')
 @authenticated
 def show_share_table_form(user):
-  table_name = request.args['table']
-  email = _get_email(user)
-  return _show_share_form(make_object_from_key(table_name), email, table_name, f'{HUB_URL}/services/galyleo/view_tables')
- 
+  _show_share_form(user, 'view_tables')
+
+@app.route('/services/galyleo/share_dashboard')
+@authenticated
+def show_share_dashboard_form(user):
+  _show_share_form(user, 'view_dashboards')
 
 
 if __name__ == '__main__':
-  app.run(host='0.0.0.0', port=os.getenv('GALYLEO_PORT', 9999))
+  app.run(host='0.0.0.0', port=os.getenv('GALYLEO_PORT', 80))

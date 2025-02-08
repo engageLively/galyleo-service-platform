@@ -8,3 +8,4 @@ sdtp>=0.2.5
 jupyterhub
 gcsfs
 requests
+gunicorn

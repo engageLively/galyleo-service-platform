@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+
+{% block title %}Dashboards{% endblock %}
+{% block head %}
+    {{ super() }}
+    <style type="text/css">
+        .important { color: #336699; }
+    </style>
+    <script>
+        function confirmAndDelete(dashboard_name) {
+            if (confirm(`Are you sure you want to delete ${dashboard_name}?`)) {
+              // User clicked OK, make an AJAX request to the server
+              // Example using Fetch API:
+              fetch(`/services/galyleo/delete_dashboard?name=${dashboard_name}`)
+              .then(response => {
+                // Handle the server's response
+              })
+              .catch(error => {
+                // Handle any errors
+              });
+            }
+          }
+
+    </script>
+{% endblock %}
+{% block content %}
+    <h1>Galyleo Data Plaform Dashboards</h1>
+    <table class="object-table">
+        <caption>Dashboards owned by {{ email }}</caption>
+        {% for dashboard in dashboards["user"] %}
+            <tr>
+                <td> {{ dashboard }}</td>
+                <td>
+                    <a href="/services/galyleo/view_dashboard?dashboard={{ dashboard }}">View </a>
+                </td>
+                <td>
+                    <a href="/services/galyleo/view_dashboard_as_json?dashboard={{ dashboard }}">View  as JSON</a>
+                </td>
+                <td>
+                    <a href="/services/galyleo/share_dashboard?name={{ dashboard }}"><button>Share</button></a>
+                </td>
+                <td>
+                    {% set dashboard_string = "'" + dashboard + "'" %}
+                    {% set call = '"confirmAndDelete(' + dashboard_string  + ');"' %}
+                    <button onclick="confirmAndDelete('{{ dashboard }}')">Delete </button>
+                </td>
+            </tr>
+            
+        {%  endfor %}
+       
+    </table>
+    <h2>Other Tables</h2>
+    <table class="object-table">
+        {% for dashboard in dashboards["other"] %}
+            <td>
+                <a href="/services/galyleo/view_dashboard?dashboard={{ dashboard }}">View </a>
+            </td>
+            <td>
+                <a href="/services/galyleo/view_dashboard_as_json?dashboard={{ dashboard }}">View  as JSON</a>
+            </td>
+        {%  endfor %}
+    </table>
+        
+    
+{% endblock %}

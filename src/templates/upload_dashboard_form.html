@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Dashboard Uploader{% endblock %}
+{% block head %}
+    {{ super() }}
+    <style type="text/css">
+        .important { color: #336699; }
+    </style>
+{% endblock %}
+{% block content %}
+   {% if email is defined %}
+    <h1>Upload a New Galyleo Dashboard</h1>
+    <p>
+        Choose a new dashboard file to upload to the Galyleo Services Platform.
+        The table named "foo.gd.json" will be available under dashboards/{{ email }}/foo.gd.json.  Note this will overwrite 
+        any dashboards of that name.
+    </p>
+    <P>
+        Currently loaded dashboards for {{ email }}:
+    </P>
+    <ul>
+        {% for dashboard_name in user_dashboards %}
+            <li> {{ dashboard_name }}</li>
+        {% endfor %}
+    </ul>
+        <form action = "/services/galyleo/upload_dashboard" method = "post" enctype="multipart/form-data">   
+            <label for="file">Choose File:</label>
+            <input type="file" name="file" accept=".gd.json"/><br>  
+            <input type = "submit" value="Upload">   
+        </form>   
+    {% endif %}
+{% endblock %}
