@@ -10,6 +10,7 @@ from functools import wraps
 from json import loads, dumps, JSONDecodeError
 from galyleo_object import GalyleoObject, make_object_from_url, make_object_from_key, check_or_raise_exception, make_object_from_url, GalyleoBadObjectException
 import permissions
+import user_agents
 
 from galyleo_object_manager import GalyleoObjectManager, GalyleoNotFoundException, GalyleoNotPermittedException
 
@@ -48,10 +49,17 @@ token_auth = HubAuth(
     api_token=SERVICE_API_TOKEN
   )
 
+def is_browser(user_agent):
+    ua = user_agents.parse(user_agent)
+    return ua.is_pc or ua.is_mobile or ua.is_tablet
+
 def oauth_ok():
     '''
     Return True iff this user agent permits OAuth authentication (is a browser)
     '''
+    requestor = request.headers.get('User-Agent')
+    if requestor and is_browser(requestor):
+      return True
     if request.headers.get('Referer') or request.headers.get('Origin'):
         return True
     accept_header = request.headers.get('Accept', '')
@@ -83,6 +91,9 @@ def oauth_callback():
     # next_url = "/services/hello/hi"
     response = make_response(redirect(next_url))
     return response
+
+
+
 
 def authenticated(f):
     """Decorator for authenticating with the Hub via OAuth"""
