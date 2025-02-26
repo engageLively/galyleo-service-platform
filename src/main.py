@@ -11,6 +11,8 @@ from json import loads, dumps, JSONDecodeError
 from galyleo_object import GalyleoObject, make_object_from_url, make_object_from_key, check_or_raise_exception, make_object_from_url, GalyleoBadObjectException
 import permissions
 import user_agents
+import uuid
+from flask_cors import CORS
 
 from galyleo_object_manager import GalyleoObjectManager, GalyleoNotFoundException, GalyleoNotPermittedException
 
@@ -32,7 +34,8 @@ JUPYTER_HUB_API_TOKEN = os.environ['JUPYTER_HUB_API_TOKEN']
 
 app = Flask(__name__, static_url_path = '/services/galyleo/static')
 app.url_map.strict_slashes = False
-app.secret_key = os.environ['GALYLEO_SECRET_KEY']
+app.secret_key = uuid.uuid4().hex
+CORS(app, supports_credentials=True)  # 🔓 Enable full CORS
 
 galyleo_object_manager = GalyleoObjectManager(GOOGLE_PROJECT,GALYLEO_PERMISSIONS_DATABASE, GALYLEO_PERMISSIONS_NAMESPACE, BUCKET_NAME)
 
@@ -40,7 +43,6 @@ auth = HubOAuth(
     api_url = HUB_API_URL,
     api_token=SERVICE_API_TOKEN,
     oauth_client_id = GALYLEO_CLIENT_ID,
-    # client_secret = '12345678',
     oauth_redirect_uri = f'{HUB_URL}{OAUTH_CALLBACK_URL}',
     cache_max_age=60)
 
@@ -93,32 +95,37 @@ def oauth_callback():
     return response
 
 
+DEBUG = os.getenv('DEBUG_GALYLEO', 'false') == 'true'
+DEBUG_USER = {'name': os.getenv("DEBUG_GALYLEO_USER", "debug_user")}
 
 
 def authenticated(f):
-    """Decorator for authenticating with the Hub via OAuth"""
+  """Decorator for authenticating with the Hub via OAuth"""
 
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        token = session.get("token")
+  @wraps(f)
+  def decorated(*args, **kwargs):
+    if DEBUG:
+      return f(DEBUG_USER, *args, **kwargs)
+      
+    token = session.get("token")
 
-        if token:
-            user = auth.user_for_token(token)
-        else:
-            user = None
+    if token:
+      user = auth.user_for_token(token)
+    else:
+      user = None
 
-        if user:
-            return f(user, *args, **kwargs)
-        elif oauth_ok():
-            # redirect to login url on failed auth
-            state = auth.generate_state(next_url=request.path)
-            response = make_response(redirect(auth.login_url + f'&state={state}'))
-            response.set_cookie(auth.state_cookie_name, state)
-            return response
-        else:
-            return f({}, *args, **kwargs) # Call f with an empty user
+    if user:
+      return f(user, *args, **kwargs)
+    elif oauth_ok():
+      # redirect to login url on failed auth
+      state = auth.generate_state(next_url=request.path)
+      response = make_response(redirect(auth.login_url + f'&state={state}'))
+      response.set_cookie(auth.state_cookie_name, state)
+      return response
+    else:
+      return f({}, *args, **kwargs) # Call f with an empty user
 
-    return decorated
+  return decorated
 
 # app = Flask(
 #   __name__,
@@ -149,7 +156,12 @@ def respond_to_ping():
   '''
   The hub pings persistently, so answer...
   '''
-  return 'OK'
+  if is_browser( request.headers.get('User-Agent')):
+    return redirect('/services/galyleo/greeting')
+  else:
+    return 'OK'
+
+
 
 @app.route('/services/galyleo/data')
 @authenticated
@@ -157,7 +169,7 @@ def render_greeting(user):
   email = user['name'] if user is not None and 'name' in user else None
   routes = ['foo', 'bar', 'baz']
   additional_routes = ['foo1', 'bar1', 'baz1']
-  return render_template('greeting.html', email = email, routes = routes, additional_routes = additional_routes)
+  return render_template('greeting.html', email = email, routes = API_ROUTES, additional_routes = additional_routes)
 
 @app.route("/services/galyleo/hello")
 @authenticated
@@ -484,11 +496,12 @@ def _gen_navbar(active, email = None):
   result  = [gen_link(link, active) for link in links]
   return result
 
+from routes import API_ROUTES
 @app.route('/services/galyleo/greeting')
 @authenticated
 def show_home(user):
   email = user['name']
-  return render_template('greeting.html', navbar_contents = _gen_navbar('greeting', email), email=email)
+  return render_template('greeting.html', navbar_contents = _gen_navbar('greeting', email), routes=API_ROUTES, email=email)
    
 
 @app.route("/services/galyleo/show_upload_data_form")
@@ -522,7 +535,7 @@ def _get_accessible_objects(kind, email):
     galyleo_object = make_object_from_key(path)
     if email and galyleo_object.owner == email:
       result["user"].append(path)
-    elif galyleo_object_manager.object_access_permitted(galyleo_object, email):
+    elif galyleo_object_manager.object_access_permitted(galyleo_object, email, email is not None):
       result["other"].append(path)
   return result
 

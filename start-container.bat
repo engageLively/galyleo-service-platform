@@ -1,0 +1,1 @@
+docker run --name galyleo-service --env-file .env -p 5000:5000 -v "C:\Users\rick\OneDrive\Projects\engageLively\jh2\galyleo-service-platform\.keys:/app/.keys" rickmcgeer/galyleo_service_platform:latest

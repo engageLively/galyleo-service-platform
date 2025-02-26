@@ -20,11 +20,18 @@
     </p>
     
     <h1> Supported API Methods</h1>
-      <ul>
-        {% for route in routes %}
-          <li> {{ route}} </li>
+    <table>
+      <tr>
+        <th>Route</th><th>Method</th><th>Parameters</th><th>Description</th>
+      </tr>
+      {% for route in routes %}
+          <tr>
+            {% for target in ['route', 'method', 'parameters', 'description'] %}
+              <td>{{ route[target] }}</td>
+            {% endfor %}
+          </tr>
         {% endfor %}
-      </ul>
+    </table>
     <h1>Supported UI Methods</h1>
       <ul>
         {% for route in additional_routes %}

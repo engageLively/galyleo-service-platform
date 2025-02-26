@@ -1,4 +1,5 @@
 Flask==3.0.3
+Flask-Cors
 pandas
 Werkzeug
 google-cloud-storage
@@ -8,3 +9,5 @@ sdtp>=0.2.5
 jupyterhub
 gcsfs
 requests
+gunicorn
+user-agents
