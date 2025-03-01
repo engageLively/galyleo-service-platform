@@ -94,10 +94,23 @@ def oauth_callback():
     response = make_response(redirect(next_url))
     return response
 
+def get_user_from_token(user_token):
+    print('Getting user from API token')
+    headers = {"Authorization": f"token {user_token}"}
+    response = requests.get(f"{HUB_API_URL}/user", headers=headers)
+    if response.status_code == 200:
+        result = response.json()
+        print(f'Hub returns {repr(result)} as user')
+        return result  
+    return None
 
 DEBUG = os.getenv('DEBUG_GALYLEO', 'false') == 'true'
 DEBUG_USER = {'name': os.getenv("DEBUG_GALYLEO_USER", "debug_user")}
 
+def _get_bearer_token(auth_header):
+  parts = auth_header.split(" ")
+  parts =[part for part in parts if len(part) > 0 and part != "token"]
+  return parts[0]
 
 def authenticated(f):
   """Decorator for authenticating with the Hub via OAuth"""
@@ -106,6 +119,15 @@ def authenticated(f):
   def decorated(*args, **kwargs):
     if DEBUG:
       return f(DEBUG_USER, *args, **kwargs)
+    
+    if "Authorization" in request.headers:
+      auth_header = request.headers.get("Authorization")
+      auth_header = auth_header.strip()
+      if auth_header.startswith("token "):
+        user_token = _get_bearer_token(auth_header)
+        user = get_user_from_token(user_token)
+        if user:
+          return f(user, *args, **kwargs)
       
     token = session.get("token")
 
@@ -115,14 +137,18 @@ def authenticated(f):
       user = None
 
     if user:
+      print(f'Got user {repr(user)} from token')
       return f(user, *args, **kwargs)
     elif oauth_ok():
       # redirect to login url on failed auth
+      print("Attempting oauth")
       state = auth.generate_state(next_url=request.path)
       response = make_response(redirect(auth.login_url + f'&state={state}'))
       response.set_cookie(auth.state_cookie_name, state)
+      print(f"OAuth success, returning {repr(response)}")
       return response
     else:
+      print("OAuth failed, returning {}")
       return f({}, *args, **kwargs) # Call f with an empty user
 
   return decorated
@@ -135,7 +161,7 @@ def authenticated(f):
 
 def _get_email(user):
   try:
-    return user['name']
+    return user['name'] if type(user) == dict else user if type(user) == str else None
   except Exception:
     return None
 
@@ -167,17 +193,13 @@ def respond_to_ping():
 @authenticated
 def render_greeting(user):
   email = user['name'] if user is not None and 'name' in user else None
-  routes = ['foo', 'bar', 'baz']
-  additional_routes = ['foo1', 'bar1', 'baz1']
-  return render_template('greeting.html', email = email, routes = API_ROUTES, additional_routes = additional_routes)
+  
+  return render_template('greeting.html', email = email, routes = API_ROUTES)
 
 @app.route("/services/galyleo/hello")
 @authenticated
 def hello(user):
-   if user is not None:
-      return f'Hello, {user['name']}'
-   else:
-      return 'User is None'
+   return repr(user)
 
 @app.route("/services/<kind>/<owner>/<name>")
 @authenticated
@@ -230,9 +252,10 @@ def publish_dashboard(user):
   """
   if user is None:
     abort(403, "Only registered hub users can publish dashboards")
+  email = _get_email(user)
   parms = _get_parameters_json( ["name", "dashboard"], ["share_list"])
   try:
-    return galyleo_object_manager.publish_dashboard(user, parms["name"], parms["dashboard"], set(parms["share_list"]) if parms["share_list"] else set())
+    return galyleo_object_manager.publish_dashboard(email, parms["name"], parms["dashboard"], set(parms["share_list"]) if parms["share_list"] else set())
   except (ValueError, JSONDecodeError):
       abort(400, f"The dashboard parameter to {request.url} was not a valid dashboard")
 
@@ -249,9 +272,10 @@ def publish_dataset(user):
   """
   if user is None:
     abort(403, "Only registered hub users can publish data")
+  email = _get_email(user)
   parms = _get_parameters_json(["name", "table"], ["share_list"])
   try:
-    return galyleo_object_manager.publish_table(user, parms["name"], parms["table"], parms["share_list"] if parms["share_list"] else ["user"])
+    return galyleo_object_manager.publish_table(email, parms["name"], parms["table"], parms["share_list"] if parms["share_list"] else ["user"])
   except (ValueError, JSONDecodeError):
       abort(400, f"The dashboard parameter to {request.url} was not a valid table")
 
@@ -265,8 +289,9 @@ def get_table_names(user):
       user: the user requesting the table names
   Errors: none
   '''
-  info = galyleo_object_manager.get_table_info(user, user != None)
-  return jsonify(info.keys())
+  email = _get_email(user)
+  info = galyleo_object_manager.get_table_info(email, email != None)
+  return jsonify([key for key in info.keys()])
 
 @app.route('/services/galyleo/get_table_schemas')
 @authenticated
@@ -277,8 +302,10 @@ def get_table_schemas(user):
   Parameters:
       user: the user requesting the table names
   Errors: none
+  
   '''
-  info = galyleo_object_manager.get_table_info(user, user != None)
+  email = _get_email(user)
+  info = galyleo_object_manager.get_table_info(email, email != None)
   return jsonify(info)
 
 def _get_parameters_get(required, optional = []):
@@ -336,7 +363,7 @@ def _get_table_if_permitted(table_name, user):
   '''
   try:
     object =  _object_from_name(table_name)
-    return galyleo_object_manager.object_if_permiited(object, user, user != None)
+    return galyleo_object_manager.get_object_if_permitted(object, user, user != None)
   except GalyleoBadObjectException as err:
     abort(400, err.message)
   except GalyleoNotPermittedException as err:
@@ -357,7 +384,8 @@ def get_table_schema(user):
           table_url: the url of the table
   '''
   parms = _get_parameters_get(['table'])
-  table = _get_table_if_permitted(table, user)
+  email = _get_email(user)
+  table = _get_table_if_permitted(parms['table'], email)
   return jsonify(table.schema)
   
     
@@ -375,7 +403,8 @@ def _get_table_and_column(user):
     aborts with an error code if any validation fails
   '''
   parms = _get_parameters_get(['table', 'column'])
-  table = _get_table_if_permitted(parms['table'], user)
+  email = _get_email(user)
+  table = _get_table_if_permitted(parms['table'], email)
   if table.column_names().index(parms['column']) < 0:
      abort(400, f'table {parms["table"]} does not have column {parms["column"]}')
   return {
@@ -395,7 +424,8 @@ def get_range_spec(user):
   Parameters:
           None
   '''
-  table_and_column = _get_table_and_column(user)
+  email = _get_email(user)
+  table_and_column = _get_table_and_column(email)
   return jsonify(table_and_column["table"].range_spec(table_and_column['column']))
   
     
@@ -410,7 +440,8 @@ def get_all_values(user):
   Arguments:
           None
   '''
-  table_and_column = _get_table_and_column(user)
+  email = _get_email(user)
+  table_and_column = _get_table_and_column(email)
   return jsonify(table_and_column["table"].all_values(table_and_column['column']))
    
     
@@ -426,7 +457,8 @@ def get_column(user):
   Arguments:
           None
   '''
-  table_and_column = _get_table_and_column(user)
+  email = _get_email(user)
+  table_and_column = _get_table_and_column(email)
   return jsonify(table_and_column["table"].get_column(table_and_column['column']))
 
   
@@ -446,8 +478,8 @@ def get_filtered_rows(user):
       The filtered rows as a JSONified list of lists
   '''
   parms = _get_parameters_json(['table'], ['columns', 'filter'])
-  
-  table = _get_table_if_permitted(parms['table'], user)
+  email = _get_email(user)
+  table = _get_table_if_permitted(parms['table'], email)
   columns = parms['columns'] if 'columns' in parms.keys() else []
   filter = parms['filter'] if 'filter' in parms.keys() else None
   missing = set(columns) - set(table.column_names())
@@ -461,7 +493,7 @@ def get_filtered_rows(user):
 @app.route("/services/galyleo/dashboards/<owner>/<dashboard>")
 @authenticated
 def get_dashboard(user, owner, dashboard):
-  email = user['name'] if user and type(user) == dict else None
+  email = _get_email(user)
   galyleo_object = GalyleoObject('dashboards', owner, dashboard)
   try:
     dashboard_object = galyleo_object_manager.get_object_if_permitted(galyleo_object, email, email is not None)
@@ -500,27 +532,28 @@ from routes import API_ROUTES
 @app.route('/services/galyleo/greeting')
 @authenticated
 def show_home(user):
-  email = user['name']
+  email = _get_email(user)
   return render_template('greeting.html', navbar_contents = _gen_navbar('greeting', email), routes=API_ROUTES, email=email)
    
 
 @app.route("/services/galyleo/show_upload_data_form")
 @authenticated
 def show_upload_data_form(user):
-  if user is None:
+  email =_get_email(user)
+  if email is None:
      flash("Must be logged in to upload tables")
      return redirect('/services/galyleo/greeting')
   tables = galyleo_object_manager.list_objects('tables', user)
-  email = user['name']
   return  render_template('upload_data_form.html',  navbar_contents = _gen_navbar('show_upload_data_form', email), email=email, user_tables=tables)
 
 @app.route("/services/galyleo/show_upload_dashboard_form")
 @authenticated
 def show_upload_dashboard_form(user):
-  if user is None:
+  email =_get_email(user)
+  if email is None:
      flash("Must be logged in to upload dashboards")
      return redirect('/services/galyleo/greeting')
-  email = user['name']
+  
   dashboards = galyleo_object_manager.list_objects('dashboards', email)
   return  render_template('upload_dashboard_form.html',  navbar_contents = _gen_navbar('show_upload_data_form', email), email=email, user_dashboard= dashboards)
   
@@ -543,14 +576,14 @@ def _get_accessible_objects(kind, email):
 @app.route('/services/galyleo/view_tables')
 @authenticated
 def view_tables(user):
-   email = user['name'] if user else None
+   email = _get_email(user) if user else None
    tables = _get_accessible_objects('tables', email)
    return render_template('view_tables.html', navbar_contents = _gen_navbar('view_tables', email), email=email, tables=tables)
 
 @app.route('/services/galyleo/view_dashboards')
 @authenticated
 def view_dashboards(user):
-  email = user['name'] if user else None
+  email =_get_email(user) if user else None
   dashboards = _get_accessible_objects('dashboards', email)
   return render_template('view_dashboards.html', navbar_contents = _gen_navbar('view_dashboards', email), email=email, dashboards=dashboards)
 
@@ -605,7 +638,7 @@ def _get_object_if_permitted(name, email):
 @app.route('/services/galyleo/view_table')
 @authenticated
 def view_table(user):
-  email = user['name'] if user and type(user) == dict else None
+  email = _get_email(user) if user and type(user) == dict else None
   table_name = request.args.get('table')
   table = _get_object_if_permitted(table_name, email)
   return render_template('view_table.html', navbar_contents = _gen_navbar('view_tables', email), email=email, table_name=table_name,  schema = table.schema)
@@ -613,7 +646,7 @@ def view_table(user):
 @app.route("/services/galyleo/view_dashboard_as_json")
 @authenticated
 def view_dashboard_as_json(user):
-  email = user['name'] if user and type(user) == dict else None
+  email =_get_email(user) if user and type(user) == dict else None
   dashboard = request.args.get('dashboard')
   galyleo_object = make_object_from_key(dashboard)
   try:
@@ -626,7 +659,7 @@ def view_dashboard_as_json(user):
 @app.route('/services/galyleo/view_dashboard')
 @authenticated
 def view_dashboard(user):
-  email = user['name'] if user and type(user) == dict else None
+  email =_get_email(user) if user and type(user) == dict else None
   dashboard_name = request.args.get('dashboard')
   galyleo_object = make_object_from_key(dashboard_name)
   if galyleo_object_manager.object_access_permitted(galyleo_object, email, email is not None):
