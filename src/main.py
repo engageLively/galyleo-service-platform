@@ -201,10 +201,15 @@ def render_greeting(user):
 def hello(user):
    return repr(user)
 
-@app.route("/services/<kind>/<owner>/<name>")
+@app.route("/services/galyleo/<kind>/<owner>/<name>")
 @authenticated
 def get_object(user, kind, owner, name):
-  return jsonify(_get_object_or_abort(kind, owner, name, user, user != None))
+  email = _get_email(user)
+  result = _get_object_or_abort(kind, owner, name, email, user != None)
+  if type(result) == dict:
+    return jsonify(result)
+  else:
+    return jsonify(result.to_dictionary())
 
 
 
