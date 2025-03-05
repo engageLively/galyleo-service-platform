@@ -436,6 +436,7 @@ def get_range_spec(user):
     
 
 @app.route('/services/galyleo/get_all_values')
+@authenticated
 def get_all_values(user):
   '''
   Target for the /get_all_values route.  Makes sure that column_name and table_name are  specified in the call, then returns the
@@ -491,7 +492,8 @@ def get_filtered_rows(user):
   if len(missing) > 0:
     abort(400, f'Table {parms["table"]} does not have columns {missing}')
   try:
-    return jsonify(table.get_filtered_rows(filter, columns))
+    result = jsonify(table.get_filtered_rows(filter, columns))
+    return result
   except InvalidDataException as err:
     abort(400, f'Error {err} in get_filtered_rows')
 
