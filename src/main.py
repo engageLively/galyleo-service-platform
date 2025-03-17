@@ -243,7 +243,14 @@ def _get_parameters_json(required, optional = []):
     missing_string = ',' .join(missing)
     abort(400, f'Required parameters {missing_string} missing from {request.base_url}')
   return result
-  
+
+def _publish_object(email, kind, name, object, share_set, error_message):
+  try:
+    galyleo_object = GalyleoObject(kind,  email, name)
+    galyleo_object_manager.publish_object(galyleo_object, object, share_set)
+    return galyleo_object.object_key
+  except (ValueError, JSONDecodeError):
+      abort(400, error_message)
 
 @app.route("/services/galyleo/publish",  methods=['POST'])
 @authenticated
@@ -259,10 +266,9 @@ def publish_dashboard(user):
     abort(403, "Only registered hub users can publish dashboards")
   email = _get_email(user)
   parms = _get_parameters_json( ["name", "dashboard"], ["share_list"])
-  try:
-    return galyleo_object_manager.publish_dashboard(email, parms["name"], parms["dashboard"], set(parms["share_list"]) if parms["share_list"] else set())
-  except (ValueError, JSONDecodeError):
-      abort(400, f"The dashboard parameter to {request.url} was not a valid dashboard")
+  share_set =  set(parms["share_list"]) if "share_list" in parms else set()
+  message = f"The dashboard parameter to {request.url} was not a valid dashboard"
+  return _publish_object(email, 'dashboards', parms['name'], parms['dashboard'], share_set, message)
 
   
 @app.route("/services/galyleo/publish_data",  methods=['POST'])
@@ -279,10 +285,9 @@ def publish_dataset(user):
     abort(403, "Only registered hub users can publish data")
   email = _get_email(user)
   parms = _get_parameters_json(["name", "table"], ["share_list"])
-  try:
-    return galyleo_object_manager.publish_table(email, parms["name"], parms["table"], parms["share_list"] if parms["share_list"] else ["user"])
-  except (ValueError, JSONDecodeError):
-      abort(400, f"The dashboard parameter to {request.url} was not a valid table")
+  share_set =  set(parms["share_list"]) if "share_list" in parms else set()
+  message = f"The dashboard parameter to {request.url} was not a valid table"
+  return _publish_object(email, 'tables', parms['name'], parms['table'], share_set, message)
 
 @app.route('/services/galyleo/get_table_names')
 @authenticated
@@ -579,6 +584,19 @@ def _get_accessible_objects(kind, email):
       result["other"].append(path)
   return result
 
+def _return_jsonified_objects(user, kind):
+  email =_get_email(user) if user else None
+  if email:
+     dashboards = galyleo_object_manager.list_objects(kind, email)
+     return jsonify(dashboards)
+  else:
+    return jsonify([])
+  
+@app.route('/services/galyleo/list_tables')
+@authenticated
+def list_tables(user):
+   return _return_jsonified_objects(user, 'tables')
+
 
 @app.route('/services/galyleo/view_tables')
 @authenticated
@@ -586,6 +604,17 @@ def view_tables(user):
    email = _get_email(user) if user else None
    tables = _get_accessible_objects('tables', email)
    return render_template('view_tables.html', navbar_contents = _gen_navbar('view_tables', email), email=email, tables=tables)
+
+
+@app.route('/services/galyleo/list_dashboards')
+@authenticated
+def list_dashboards(user):
+  '''
+  API access to list the dashboards OWNED by this user
+  '''
+  return _return_jsonified_objects(user, 'dashboards')
+
+
 
 @app.route('/services/galyleo/view_dashboards')
 @authenticated
