@@ -1,18 +1,18 @@
-from flask import Flask, Response, send_from_directory, make_response, redirect, request, session, abort,  jsonify, render_template, flash # type: ignore # type: ignore
-import requests # type: ignore
-from sdtp import InvalidDataException # type: ignore
-from sdtp  import SDML_BOOLEAN, SDML_DATE, SDML_DATETIME, SDML_NUMBER, SDML_PYTHON_TYPES, SDML_SCHEMA_TYPES, SDML_STRING, SDML_TIME_OF_DAY # type: ignore
-from sdtp.sdtp_table import SDMLTable, SDMLFixedTable, SDMLDataFrameTable, RowTable, RemoteSDMLTable, SDMLTableFactory, RowTableFactory, RemoteSDMLTableFactory, FileTable, FileTableFactory, GCSTable, GCSTableFactory, HTTPTable, HTTPTableFactory # type: ignore
-from sdtp.table_server import  TableServer, TableNotFoundException, ColumnNotFoundException # type: ignore
+from flask import Flask, Response, send_from_directory, make_response, redirect, request, session, abort,  jsonify, render_template, flash
+import requests
+from sdtp import InvalidDataException
+from sdtp  import SDML_BOOLEAN, SDML_DATE, SDML_DATETIME, SDML_NUMBER, SDML_PYTHON_TYPES, SDML_SCHEMA_TYPES, SDML_STRING, SDML_TIME_OF_DAY
+from sdtp.sdtp_table import SDMLTable, SDMLFixedTable, SDMLDataFrameTable, RowTable, RemoteSDMLTable, SDMLTableFactory, RowTableFactory, RemoteSDMLTableFactory, FileTable, FileTableFactory, GCSTable, GCSTableFactory, HTTPTable, HTTPTableFactory
+from sdtp.table_server import  TableServer, TableNotFoundException, ColumnNotFoundException
 import os
-from jupyterhub.services.auth import HubOAuth, HubAuth # type: ignore
+from jupyterhub.services.auth import HubOAuth, HubAuth
 from functools import wraps
 from json import loads, dumps, JSONDecodeError
 from galyleo_object import GalyleoObject, make_object_from_url, make_object_from_key, check_or_raise_exception, make_object_from_url, GalyleoBadObjectException
 import permissions
-import user_agents # type: ignore
+import user_agents
 import uuid
-from flask_cors import CORS # type: ignore
+from flask_cors import CORS
 from utils import backup_users
 import datetime
 
