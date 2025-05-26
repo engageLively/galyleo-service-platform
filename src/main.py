@@ -13,7 +13,7 @@ import permissions
 import user_agents # type: ignore
 import uuid
 from flask_cors import CORS # type: ignore
-from utils import backup_users
+# from utils import backup_users
 import datetime
 
 from galyleo_object_manager import GalyleoObjectManager, GalyleoNotFoundException, GalyleoNotPermittedException
@@ -229,14 +229,14 @@ def respond_to_ping():
   if DEBUG:
     return 'OK'
   now = datetime.datetime.now()
-  try:
-    update = LAST_USER_BACKUP is None or (now - LAST_USER_BACKUP).total_seconds() > BACKUP_INTERVAL
-  except NameError:
-    update = True
-  if update:
-    user_list = _list_users()
-    backup_users(GOOGLE_PROJECT, GALYLEO_PERMISSIONS_DATABASE, GALYLEO_PERMISSIONS_NAMESPACE, HUB_URL, user_list)
-    LAST_USER_BACKUP = now
+  # try:
+  #   update = LAST_USER_BACKUP is None or (now - LAST_USER_BACKUP).total_seconds() > BACKUP_INTERVAL
+  # except NameError:
+  #   update = True
+  # if update:
+  #   user_list = _list_users()
+  #   backup_users(GOOGLE_PROJECT, GALYLEO_PERMISSIONS_DATABASE, GALYLEO_PERMISSIONS_NAMESPACE, HUB_URL, user_list)
+  #   LAST_USER_BACKUP = now
   if is_browser( request.headers.get('User-Agent')):
     return redirect('/services/galyleo/greeting')
   else:
