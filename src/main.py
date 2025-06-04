@@ -15,6 +15,13 @@ import uuid
 from flask_cors import CORS # type: ignore
 # from utils import backup_users
 import datetime
+import logging
+import sys
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
 
 from galyleo_object_manager import GalyleoObjectManager, GalyleoNotFoundException, GalyleoNotPermittedException
 
@@ -105,6 +112,11 @@ def oauth_ok():
         return True
     return False
 
+@app.route('/services/galyleo/debug-headers')
+def debug_headers():
+    headers = {k: v for k, v in request.headers.items()}
+    return headers  # Flask auto converts dict to JSON response
+
 @app.route('/services/galyleo/foo')
 def foo():
    return 'Foo!'
@@ -154,11 +166,40 @@ def _get_bearer_token(auth_header):
   parts =[part for part in parts if len(part) > 0 and part != "token"]
   return parts[0]
 
+from urllib.parse import urlparse
+import re
+
+def _get_user_from_forwarded_path():
+    forwarded_path = request.headers.get("X-Forwarded-Path", "")
+    match = re.match(r"^/user/([^/]+)/", forwarded_path)
+    if match:
+        return match.group(1)
+    return None
+
+def _is_request_from_hub_proxy():
+    """Verify request comes from trusted proxy by checking X-Forwarded-Host."""
+    forwarded_host = request.headers.get("X-Forwarded-Host", "")
+    hub_host = urlparse(HUB_URL).netloc
+    return forwarded_host == hub_host
+
 def authenticated(f):
   """Decorator for authenticating with the Hub via OAuth"""
 
   @wraps(f)
   def decorated(*args, **kwargs):
+    
+    if "JupyterHub-User" in request.headers:
+      username = username
+      print(f'Authenticated user {username} from JupyterHub-User')
+      return f({"name": username}, *args, **kwargs)
+    
+    if _is_request_from_hub_proxy():
+      user_from_path = _get_user_from_forwarded_path()
+      if user_from_path:
+          print(f'Authenticated user {user_from_path} from X-Forwarded-Path')
+          # User authenticated from /user/<username> in URL
+          return f({"name": user_from_path}, *args, **kwargs)
+    
     if DEBUG:
       return f(DEBUG_USER, *args, **kwargs)
     
@@ -249,7 +290,7 @@ def respond_to_ping():
 def render_greeting(user):
   email = user['name'] if user is not None and 'name' in user else None
   
-  return render_template('greeting.html', email = email, routes = API_ROUTES)
+  return render_template('greeting.html', email = email, routes = API_ROUTES, uuid=str(uuid.uuid4()))
 
 @app.route("/services/galyleo/hello")
 @authenticated
@@ -595,12 +636,20 @@ def _gen_navbar(active, email = None):
   result  = [gen_link(link, active) for link in links]
   return result
 
+# Turn off caching
+@app.after_request
+def add_no_cache_headers(response):
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
 from routes import API_ROUTES
 @app.route('/services/galyleo/greeting')
 @authenticated
 def show_home(user):
   email = _get_email(user)
-  return render_template('greeting.html', navbar_contents = _gen_navbar('greeting', email), routes=API_ROUTES, email=email)
+  return render_template('greeting.html', navbar_contents = _gen_navbar('greeting', email), routes=API_ROUTES, email=email, uuid=str(uuid.uuid4()))
    
 
 @app.route("/services/galyleo/show_upload_data_form")
@@ -611,7 +660,7 @@ def show_upload_data_form(user):
      flash("Must be logged in to upload tables")
      return redirect('/services/galyleo/greeting')
   tables = galyleo_object_manager.list_objects('tables', user)
-  return  render_template('upload_data_form.html',  navbar_contents = _gen_navbar('show_upload_data_form', email), email=email, user_tables=tables)
+  return  render_template('upload_data_form.html',  navbar_contents = _gen_navbar('show_upload_data_form', email), email=email, user_tables=tables, uuid=str(uuid.uuid4()))
 
 @app.route("/services/galyleo/show_upload_dashboard_form")
 @authenticated
@@ -622,7 +671,7 @@ def show_upload_dashboard_form(user):
      return redirect('/services/galyleo/greeting')
   
   dashboards = galyleo_object_manager.list_objects('dashboards', email)
-  return  render_template('upload_dashboard_form.html',  navbar_contents = _gen_navbar('show_upload_data_form', email), email=email, user_dashboard= dashboards)
+  return  render_template('upload_dashboard_form.html',  navbar_contents = _gen_navbar('show_upload_data_form', email), email=email, user_dashboard= dashboards, uuid=str(uuid.uuid4()))
   
 
 def _get_accessible_objects(kind, email):
@@ -658,7 +707,7 @@ def list_tables(user):
 def view_tables(user):
    email = _get_email(user) if user else None
    tables = _get_accessible_objects('tables', email)
-   return render_template('view_tables.html', navbar_contents = _gen_navbar('view_tables', email), email=email, tables=tables)
+   return render_template('view_tables.html', navbar_contents = _gen_navbar('view_tables', email), email=email, tables=tables, uuid=str(uuid.uuid4()))
 
 
 @app.route('/services/galyleo/list_dashboards')
@@ -676,7 +725,7 @@ def list_dashboards(user):
 def view_dashboards(user):
   email =_get_email(user) if user else None
   dashboards = _get_accessible_objects('dashboards', email)
-  return render_template('view_dashboards.html', navbar_contents = _gen_navbar('view_dashboards', email), email=email, dashboards=dashboards)
+  return render_template('view_dashboards.html', navbar_contents = _gen_navbar('view_dashboards', email), email=email, dashboards=dashboards, uuid=str(uuid.uuid4()))
 
 @app.route('/services/galyleo/login')
 @authenticated
@@ -717,7 +766,14 @@ def _delete_object(email, next_page):
 @app.route('/services/galyleo/delete_table')
 @authenticated
 def delete_table(user):
-  _delete_object(_get_email(user), '/services/galyleo/view_tables')
+  # return _delete_object(_get_email(user), '/services/galyleo/view_tables')
+  return _delete_object(_get_email(user), '/services/galyleo/greeting')
+
+@app.route('/services/galyleo/delete_dashboard')
+@authenticated
+def delete_dashboard(user):
+  # return _delete_object(_get_email(user), '/services/galyleo/view_dashboards')
+  return _delete_object(_get_email(user), '/services/galyleo/greeting')
 
 @app.route('/services/galyleo/list_users')
 @authenticated
@@ -738,7 +794,7 @@ def view_table(user):
   email = _get_email(user) if user and type(user) == dict else None
   table_name = request.args.get('table')
   table = _get_object_if_permitted(table_name, email)
-  return render_template('view_table.html', navbar_contents = _gen_navbar('view_tables', email), email=email, table_name=table_name,  schema = table.schema)
+  return render_template('view_table.html', navbar_contents = _gen_navbar('view_tables', email), email=email, table_name=table_name,  schema = table.schema, uuid=str(uuid.uuid4()))
 
 @app.route("/services/galyleo/view_dashboard_as_json")
 @authenticated
@@ -748,7 +804,7 @@ def view_dashboard_as_json(user):
   galyleo_object = make_object_from_key(dashboard)
   try:
     dashboard_object = galyleo_object_manager.get_object_if_permitted(galyleo_object, email, email is not None)
-    return render_template('view_dashboard.html', navbar_contents = _gen_navbar('view_dashboard', email), email=email, dashboard_name=dashboard,  dashboard = dashboard_object)
+    return render_template('view_dashboard.html', navbar_contents = _gen_navbar('view_dashboard', email), email=email, dashboard_name=dashboard,  dashboard = dashboard_object, uuid=str(uuid.uuid4()))
   except(GalyleoNotPermittedException, GalyleoNotFoundException) as err:
     flash(err.message)
     return redirect('/services/galyleo/view_dashboards')
@@ -780,8 +836,9 @@ def share_object(user):
 
 
 def _hub_users():
-  response = requests.get(f'{HUB_API_URL}/users', headers={"Authorization": f"token {JUPYTER_HUB_API_TOKEN}"})
-  user_list = response.json()
+  # response = requests.get(f'{HUB_API_URL}/users', headers={"Authorization": f"token {JUPYTER_HUB_API_TOKEN}"})
+  # user_list = response.json()
+  user_list = _list_users()
   return [user["name"] for user in user_list] + [permissions.HUB, permissions.PUBLIC]
 
 def _show_share_form(user, next_url):
@@ -793,20 +850,21 @@ def _show_share_form(user, next_url):
     return redirect('/services/galyleo/greeting')
   users = set(_hub_users()) - {email} # sharing permissions on the owner can't be changed
   allowed_users = galyleo_object_manager.permissions_manager.get_users(galyleo_object)
-  user_struct_list = [{"name": user, "permitted": user in allowed_users} for user in users]
-  return render_template("share_form.html", navbar_contents = _gen_navbar('', email), email=email, object_name=name,  users = user_struct_list, prev_page = f'{HUB_URL}/services/galyleo/{next_url}')
+  user_struct_list = [{"name": user, "permitted": user in allowed_users} for user in users] if users is not None else []
+  template = render_template("share_form.html", navbar_contents = _gen_navbar('', email), email=email, object_name=name,  users = user_struct_list, prev_page = f'{HUB_URL}/services/galyleo/{next_url}', uuid=str(uuid.uuid4()))
+  return template
    
   
 
 @app.route('/services/galyleo/share_table')
 @authenticated
 def show_share_table_form(user):
-  _show_share_form(user, 'view_tables')
+  return _show_share_form(user, 'view_tables')
 
 @app.route('/services/galyleo/share_dashboard')
 @authenticated
 def show_share_dashboard_form(user):
-  _show_share_form(user, 'view_dashboards')
+  return _show_share_form(user, 'view_dashboards')
 
 
 if __name__ == '__main__':
