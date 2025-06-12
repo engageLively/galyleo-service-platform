@@ -9,58 +9,71 @@
   <meta http-equiv="refresh" content="0;url=noscript.html">
   </noscript>
   <title>Galyleo Dashboard</title>
-  <link type="text/css" rel="stylesheet" id="lively-font-bundle" href="assets/fonts/fonts.css">
+  <link type="text/css" rel="stylesheet" id="lively-font-bundle" href="assets/fonts/fonts.css" onload="document.LIVELY_FONTS_LOADED = true">
   <link type="text/css" rel="stylesheet" id="lively-morphic-css" href="assets/morphic.css">
   <link type="text/css" rel="stylesheet" id="lively-project-css" href="assets/bundle.css">
 
-  <script>
+  <link rel="preload" href="./assets/NotoSansJP-Regular.woff2" as="font"><script>
     window.frozenPart = {
       renderFrozenPart: (domNode, baseURL) => {
         if (baseURL) System.config( { baseURL });
         if (!baseURL) baseURL = './';
         System.config({
           meta: {
-           [baseURL + '__rootModule___commonjs-entry-2a340242.js']: {format: "system"},
-[baseURL + 'index-4f2bdafd.js']: {format: "system"},
-[baseURL + 'index-57981d2f.js']: {format: "system"},
-[baseURL + 'loading-indicator.cp-680c2ecd.js']: {format: "system"},
-[baseURL + 'ui.cp-46daffed.js']: {format: "system"},
-[baseURL + 'messages.cp-ccfb5763.js']: {format: "system"},
-[baseURL + 'object-classes-cce74fc2.js']: {format: "system"},
-[baseURL + 'code-search.cp-140da4d6.js']: {format: "system"},
-[baseURL + 'canvas-eb622915.js']: {format: "system"},
-[baseURL + 'inputs-b8bdf948.js']: {format: "system"},
-[baseURL + 'dialogs.cp-40ebcbc0.js']: {format: "system"},
-[baseURL + 'editor-plugin-b7298219.js']: {format: "system"},
-[baseURL + 'editor-modes-146d3c1c.js']: {format: "system"},
-[baseURL + 'search-1fb0a4bc.js']: {format: "system"},
-[baseURL + 'morph-to-image-e16449de.js']: {format: "system"},
-[baseURL + 'map-2ab131db.js']: {format: "system"},
-[baseURL + 'spell-checker-a3ec6e84.js']: {format: "system"},
-[baseURL + 'text-editor-c46e6e07.js']: {format: "system"},
-[baseURL + 'index-3bdd1c4b.js']: {format: "system"},
-[baseURL + 'zoom-indicator.cp-90bdb305.js']: {format: "system"},
-[baseURL + 'flap.cp-c43fc5c1.js']: {format: "system"},
-[baseURL + 'scene-graph.cp-394379ef.js']: {format: "system"},
-[baseURL + 'debugging-91eb99b4.js']: {format: "system"},
-[baseURL + 'html-generator-d5ca1544.js']: {format: "system"},
-[baseURL + 'fabrik-de151c15.js']: {format: "system"},
-[baseURL + 'diff@5.0-976ac4cc.js']: {format: "system"},
-[baseURL + 'ui.cp-a0677399.js']: {format: "system"},
-[baseURL + 'http-file-browser-28ec4e64.js']: {format: "system"},
-[baseURL + 'publish-new-package-version-40b9f95e.js']: {format: "system"},
-[baseURL + 'bootstrap-eae411bd.js']: {format: "system"},
-[baseURL + 'loading-screen.cp-57f76c89.js']: {format: "system"},
-[baseURL + 'mocha-tests-20b1f17b.js']: {format: "system"},
-[baseURL + 'plugin-json-0982093e.js']: {format: "system"},
-[baseURL + 'occur-a28e6568.js']: {format: "system"},
-[baseURL + 'search.cp-87d23620.js']: {format: "system"},
-[baseURL + 'index-86b6196b.js']: {format: "system"},
-[baseURL + 'index-9ef930ec.js']: {format: "system"},
-[baseURL + '__rootModule___commonjs-entry-b127d813.js']: {format: "system"}
+           [baseURL + '__rootModule___commonjs-entry-ecbee8e0.js']: {format: "system", nonce: "lively" },
+[baseURL + 'index-68405094.js']: {format: "system", nonce: "lively" },
+[baseURL + 'index-d9cf32c9.js']: {format: "system", nonce: "lively" },
+[baseURL + 'index-5f78d1ff.js']: {format: "system", nonce: "lively" },
+[baseURL + 'loading-indicator.cp-d8b142e0.js']: {format: "system", nonce: "lively" },
+[baseURL + 'ui.cp-1ad326c5.js']: {format: "system", nonce: "lively" },
+[baseURL + 'messages.cp-d2890276.js']: {format: "system", nonce: "lively" },
+[baseURL + 'object-classes-addbdc5f.js']: {format: "system", nonce: "lively" },
+[baseURL + 'index-009b6510.js']: {format: "system", nonce: "lively" },
+[baseURL + 'code-search.cp-a77b57ce.js']: {format: "system", nonce: "lively" },
+[baseURL + 'canvas-dcad041a.js']: {format: "system", nonce: "lively" },
+[baseURL + 'shell-interface-31670943.js']: {format: "system", nonce: "lively" },
+[baseURL + 'index-a74b148b.js']: {format: "system", nonce: "lively" },
+[baseURL + 'dialogs.cp-8b893c44.js']: {format: "system", nonce: "lively" },
+[baseURL + 'client-command-255200bf.js']: {format: "system", nonce: "lively" },
+[baseURL + 'client-resource-782f0b19.js']: {format: "system", nonce: "lively" },
+[baseURL + 'list.cp-fcc0aacb.js']: {format: "system", nonce: "lively" },
+[baseURL + 'client-0e40a129.js']: {format: "system", nonce: "lively" },
+[baseURL + 'editor-plugin-6e8aa844.js']: {format: "system", nonce: "lively" },
+[baseURL + 'editor-modes-96a6d0da.js']: {format: "system", nonce: "lively" },
+[baseURL + 'morph-to-image-1ce3508d.js']: {format: "system", nonce: "lively" },
+[baseURL + 'search-77b10196.js']: {format: "system", nonce: "lively" },
+[baseURL + 'map-6252eb78.js']: {format: "system", nonce: "lively" },
+[baseURL + 'index-ee39af22.js']: {format: "system", nonce: "lively" },
+[baseURL + 'npm_functional-red-black-tree@1.0-d4da6a21.js']: {format: "system", nonce: "lively" },
+[baseURL + 'spell-checker-0ba5cfba.js']: {format: "system", nonce: "lively" },
+[baseURL + 'text-editor-f0d740d8.js']: {format: "system", nonce: "lively" },
+[baseURL + 'index-af9e3f39.js']: {format: "system", nonce: "lively" },
+[baseURL + 'zoom-indicator.cp-9b28790a.js']: {format: "system", nonce: "lively" },
+[baseURL + 'flap.cp-7d924a76.js']: {format: "system", nonce: "lively" },
+[baseURL + 'scene-graph.cp-673e5647.js']: {format: "system", nonce: "lively" },
+[baseURL + 'debugging-d7b4bf21.js']: {format: "system", nonce: "lively" },
+[baseURL + 'fabrik-2e6a6cb5.js']: {format: "system", nonce: "lively" },
+[baseURL + 'ui.cp-1ca93ddb.js']: {format: "system", nonce: "lively" },
+[baseURL + 'linter-fed8a082.js']: {format: "system", nonce: "lively" },
+[baseURL + 'path-91552b5f.js']: {format: "system", nonce: "lively" },
+[baseURL + 'http-file-browser-5c9409bf.js']: {format: "system", nonce: "lively" },
+[baseURL + 'publish-new-package-version-54ba35a7.js']: {format: "system", nonce: "lively" },
+[baseURL + 'bootstrap-c62554c5.js']: {format: "system", nonce: "lively" },
+[baseURL + 'mocha-es6-5c28146c.js']: {format: "system", nonce: "lively" },
+[baseURL + 'mocha-tests-c19fc12d.js']: {format: "system", nonce: "lively" },
+[baseURL + 'test-analysis-fc4e44f9.js']: {format: "system", nonce: "lively" },
+[baseURL + 'plugin-json-33398c1d.js']: {format: "system", nonce: "lively" },
+[baseURL + 'occur-4ceb9b03.js']: {format: "system", nonce: "lively" },
+[baseURL + 'search.cp-ed8d2555.js']: {format: "system", nonce: "lively" },
+[baseURL + 'index-afa4bba4.js']: {format: "system", nonce: "lively" },
+[baseURL + 'index-fa3f1c5b.js']: {format: "system", nonce: "lively" },
+[baseURL + 'index-5521d3c1.js']: {format: "system", nonce: "lively" },
+[baseURL + '__rootModule___commonjs-entry-7880cc9e.js']: {format: "system", nonce: "lively" }
           }
         });
-        System.import("./__rootModule___commonjs-entry-b127d813.js").then(m => { System.trace = false; m.renderFrozenPart(domNode); });
+        
+        System.trace = false;
+        System.import("./__rootModule___commonjs-entry-7880cc9e.js").then(m => { m.renderFrozenPart(domNode); });
       }
     }
   </script>

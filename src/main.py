@@ -289,7 +289,6 @@ def respond_to_ping():
 @authenticated
 def render_greeting(user):
   email = user['name'] if user is not None and 'name' in user else None
-  
   return render_template('greeting.html', email = email, routes = API_ROUTES, uuid=str(uuid.uuid4()))
 
 @app.route("/services/galyleo/hello")
@@ -382,7 +381,7 @@ def publish_dataset(user):
   email = _get_email(user)
   parms = _get_parameters_json(["name", "table"], ["share_list"])
   share_set =  set(parms["share_list"]) if "share_list" in parms else set()
-  message = f"The dashboard parameter to {request.url} was not a valid table"
+  message = f"The table parameter to {request.url} was not a valid table"
   return _publish_object(email, 'tables', parms['name'], parms['table'], share_set, message)
 
 @app.route('/services/galyleo/get_table_names')
@@ -762,18 +761,33 @@ def _delete_object(email, next_page):
   else:
      flash(f'Only {galyleo_object.owner} can delete an object')
   return redirect(next_page)
+
+@app.route('/services/galyleo/delete_table_confirm')
+@authenticated
+def confirm_delete_table(user):
+  email = _get_email(user)
+  table = request.args.get('name')
+  return render_template('delete_table.html',navbar_contents = _gen_navbar('view_tables', email), email=email, table=table, uuid=str(uuid.uuid4()))
+
     
 @app.route('/services/galyleo/delete_table')
 @authenticated
 def delete_table(user):
   # return _delete_object(_get_email(user), '/services/galyleo/view_tables')
-  return _delete_object(_get_email(user), '/services/galyleo/greeting')
+  return _delete_object(_get_email(user), '/services/galyleo/view_tables')
+
+@app.route('/services/galyleo/delete_dashboard_confirm')
+@authenticated
+def confirm_delete_dashboard(user):
+  email = _get_email(user)
+  dashboard = request.args.get('name')
+  return render_template('delete_dashboard.html', navbar_contents = _gen_navbar('view_tables', email), email=email, dashboard=dashboard, uuid=str(uuid.uuid4()))
 
 @app.route('/services/galyleo/delete_dashboard')
 @authenticated
 def delete_dashboard(user):
   # return _delete_object(_get_email(user), '/services/galyleo/view_dashboards')
-  return _delete_object(_get_email(user), '/services/galyleo/greeting')
+  return _delete_object(_get_email(user), '/services/galyleo/view_dashboards')
 
 @app.route('/services/galyleo/list_users')
 @authenticated
@@ -804,7 +818,12 @@ def view_dashboard_as_json(user):
   galyleo_object = make_object_from_key(dashboard)
   try:
     dashboard_object = galyleo_object_manager.get_object_if_permitted(galyleo_object, email, email is not None)
-    return render_template('view_dashboard.html', navbar_contents = _gen_navbar('view_dashboard', email), email=email, dashboard_name=dashboard,  dashboard = dashboard_object, uuid=str(uuid.uuid4()))
+    # this is really stupid; on disk it's a JSON file, we read it
+    # into  an object, then jsonify it again -- we need to pass
+    # a raw argument into get_object_if_permitted, returning json 
+    # if raw = True.  But for now...
+    dashboard_json_object = dumps(dashboard_object, indent=2)
+    return render_template('view_dashboard.html', navbar_contents = _gen_navbar('view_dashboard', email), email=email, dashboard_name=dashboard,  dashboard = dashboard_json_object, uuid=str(uuid.uuid4()))
   except(GalyleoNotPermittedException, GalyleoNotFoundException) as err:
     flash(err.message)
     return redirect('/services/galyleo/view_dashboards')

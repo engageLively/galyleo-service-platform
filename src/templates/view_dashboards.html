@@ -22,6 +22,8 @@
             }
           }
 
+
+
     </script>
 {% endblock %}
 {% block content %}
@@ -41,9 +43,12 @@
                     <a href="/services/galyleo/share_dashboard?name={{ dashboard }}"><button>Share</button></a>
                 </td>
                 <td>
+                    <a href="/services/galyleo/delete_dashboard_confirm?name={{ dashboard }}"><button>Delete {{ dashboard }}</button></a>
+                    <!--
                     {% set dashboard_string = "'" + dashboard + "'" %}
                     {% set call = '"confirmAndDelete(' + dashboard_string  + ');"' %}
                     <button onclick="confirmAndDelete('{{ dashboard }}')">Delete </button>
+                    -->
                 </td>
             </tr>
             

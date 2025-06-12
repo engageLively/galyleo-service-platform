@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Confirm delete {{ dashboard }}{% endblock %}
+{% block content %}
+  <p>Really delete {{ dashboard }}? This cannot be undone.</p>
+  <p><a href="/services/galyleo/delete_dashboard?name={{ dashboard }}"> <button>Delete</button></a></p>
+  <p><a href="/services/galyleo/view_dashboards"> <button>Cancel</button></a></p>
+{% endblock %}

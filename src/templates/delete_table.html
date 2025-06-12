@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Confirm delete {{ table }}{% endblock %}
+{% block content %}
+  <p>Really delete {{ table }}? This cannot be undone.</p>
+  <p><a href="/services/galyleo/delete_table?name={{ table }}"> <button>Delete</button></a></p>
+  <p><a href="/services/galyleo/view_tables"> <button>Cancel</button></a></p>
+{% endblock %}

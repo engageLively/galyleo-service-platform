@@ -35,9 +35,12 @@
                     <a href="/services/galyleo/share_table?name={{ table }}"><button>Share {{ table }}</button></a>
                 </td>
                 <td>
+                    <a href="/services/galyleo/delete_table_confirm?name={{ table }}"><button>Delete {{ table }}</button></a>
+                    <!--
                     {% set table_string = "'" + table + "'" %}
                     {% set call = '"confirmAndDelete(' + table_string  + ');"' %}
                     <button onclick="confirmAndDelete('{{ table }}')">Delete {{ table }}</button>
+                    -->
                 </td>
             </tr>
             

@@ -196,10 +196,11 @@ class GalyleoObjectManager:
       No return
     Raises:
       ValueError if the object isn't in the right format
-      JSONDecodeError if the dashboard can't be turned into JSON
+      JSONDecodeError if the object can't be turned into JSON
     '''
-    object_to_write = object_data if type(object_data) == str else dumps(object_data)
-    object_to_load = loads(object_data) if type(object_data) == str else object_data
+    object_to_write = object_data if type(object_data) == str else dumps(object_data, indent=2)
+    # object_to_load = loads(object_data) if type(object_data) == str else object_data
+    object_to_load = loads(object_to_write)
     if galyleo_object.kind == 'dashboards':
       self._validate_dashboard(object_to_load)
     if galyleo_object.kind == 'tables':
@@ -213,7 +214,7 @@ class GalyleoObjectManager:
     '''
     Delete the dashboard user/dashboard_name from the repository.
     Parameters:
-      galyleo_obejct: the object to remove
+      galyleo_object: the object to remove
     Returns: 
       No return 
     Raises:
