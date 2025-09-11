@@ -1,5 +1,7 @@
 # Use Python 3.12 on Debian Bullseye as the base image
 FROM python:3.12-bullseye
+ARG CACHE_BUST
+LABEL cache_bust="${CACHE_BUST}"
 
 # Set the working directory inside the container
 WORKDIR /app
