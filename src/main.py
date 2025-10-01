@@ -1,9 +1,7 @@
 from flask import Flask, Response, send_from_directory, make_response, redirect, request, session, abort,  jsonify, render_template, flash # type: ignore # type: ignore
 import requests # type: ignore
 from sdtp import InvalidDataException # type: ignore
-from sdtp  import SDML_BOOLEAN, SDML_DATE, SDML_DATETIME, SDML_NUMBER, SDML_PYTHON_TYPES, SDML_SCHEMA_TYPES, SDML_STRING, SDML_TIME_OF_DAY # type: ignore
-from sdtp.sdtp_table import SDMLTable, SDMLFixedTable, SDMLDataFrameTable, RowTable, RemoteSDMLTable, SDMLTableFactory, RowTableFactory, RemoteSDMLTableFactory, FileTable, FileTableFactory, GCSTable, GCSTableFactory, HTTPTable, HTTPTableFactory # type: ignore
-from sdtp.table_server import  TableServer, TableNotFoundException, ColumnNotFoundException # type: ignore
+ # type: ignore
 import os
 from jupyterhub.services.auth import HubOAuth, HubAuth # type: ignore
 from functools import wraps
@@ -789,13 +787,6 @@ def delete_dashboard(user):
   # return _delete_object(_get_email(user), '/services/galyleo/view_dashboards')
   return _delete_object(_get_email(user), '/services/galyleo/view_dashboards')
 
-@app.route('/services/galyleo/list_users')
-@authenticated
-def list_users(user):
-  if user is not None:
-    return jsonify(_list_users())
-  else:
-    return 'list_users is only available to registered users', 401
 
 def _get_object_if_permitted(name, email):
   galyleo_object = make_object_from_key(name)
@@ -845,20 +836,16 @@ def view_dashboard(user):
 def share_object(user):
   email = _get_email(user)
   object_name = request.form.get('object_name')
-  selected_users = loads(request.form.get('user_list'))
+  selected_users = loads(request.form.get('share_list'))
+  if bool(request.form.get('hub_shared')):
+        selected_users.append(permissions.HUB)
+  if bool(request.form.get('public_shared')):
+      selected_users.append(permissions.PUBLIC)
   galyleo_object = make_object_from_key(object_name)
   galyleo_object_manager.update_user_access(galyleo_object, set(selected_users))
   prev_page = request.form.get('prev_page')
   # return jsonify({'email': email, 'object_name': object_name, 'selected_users': selected_users})
   return redirect(prev_page)
-
-
-
-def _hub_users():
-  # response = requests.get(f'{HUB_API_URL}/users', headers={"Authorization": f"token {JUPYTER_HUB_API_TOKEN}"})
-  # user_list = response.json()
-  user_list = _list_users()
-  return [user["name"] for user in user_list] + [permissions.HUB, permissions.PUBLIC]
 
 def _show_share_form(user, next_url):
   name = request.args['name']
@@ -867,10 +854,19 @@ def _show_share_form(user, next_url):
   if email != galyleo_object.owner:
     flash(f'Only {galyleo_object.owner} can change the sharing of {name}, not {email}')
     return redirect('/services/galyleo/greeting')
-  users = set(_hub_users()) - {email} # sharing permissions on the owner can't be changed
   allowed_users = galyleo_object_manager.permissions_manager.get_users(galyleo_object)
-  user_struct_list = [{"name": user, "permitted": user in allowed_users} for user in users] if users is not None else []
-  template = render_template("share_form.html", navbar_contents = _gen_navbar('', email), email=email, object_name=name,  users = user_struct_list, prev_page = f'{HUB_URL}/services/galyleo/{next_url}', uuid=str(uuid.uuid4()))
+  share_list = list(set(allowed_users) - {permissions.HUB, permissions.PUBLIC, email})
+  template = render_template(
+    "share_form_new.html",
+    navbar_contents = _gen_navbar('', email),
+    email=email,
+    object_name=name,
+    share_list = share_list,
+    prev_page = f'{HUB_URL}/services/galyleo/{next_url}',
+    post_page = f'{HUB_URL}/services/galyleo/share_object',
+    hub_shared = permissions.HUB in allowed_users,
+    public_shared = permissions.PUBLIC in allowed_users,
+    uuid=str(uuid.uuid4()))
   return template
    
   

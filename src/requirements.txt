@@ -4,9 +4,10 @@ Werkzeug
 google-cloud-storage
 google-cloud-core
 google-cloud-datastore
-sdtp>=0.2.5
+sdtp==2025.10.1
 jupyterhub
 gcsfs
 requests
 gunicorn
 user-agents
+flask-cors
