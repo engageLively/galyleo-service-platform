@@ -33,7 +33,6 @@
 </form>
 
 <script>
-  // Linter ignore: Jinja2 `tojson` is safe and required here
 let shareList = {{ share_list|tojson }};
 function renderShareList() {
   const ul = document.getElementById('share-list');

@@ -199,7 +199,7 @@ System.register(['./__rootModule___commonjs-entry-7f4eef7f.js', './client-7e152e
 
       __varRecorder__.doGrep = doGrep;
       __varRecorder__.defaultConnection = {
-        url: "".concat(document.location.origin, "/lively-socket.io"),
+        url: "".concat(document.location.origin, "/_disabled_lively_socket_io"),
         namespace: "l2l"
       };
       __varRecorder__.runCommand = runCommand;

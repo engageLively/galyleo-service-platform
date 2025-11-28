@@ -1,7 +1,7 @@
-from sdtp import TableServer, InvalidDataException
+from sdtp import TableServer, InvalidDataException # type: ignore
 from json import loads, dumps, JSONDecodeError
 from  galyleo_storage import GalyleoStorageManager
-from google.cloud.exceptions import NotFound
+from google.cloud.exceptions import NotFound # type: ignore
 import permissions 
 from galyleo_object import GalyleoObject, GalyleoBadObjectException, make_object_from_key
 

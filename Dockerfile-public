@@ -1,0 +1,27 @@
+# /mnt/data/Dockerfile-public (suggested replacement)
+FROM python:3.12-bullseye
+
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+RUN python -m pip list | grep -i fastapi || true
+# Copy source into /app so imports like `public:app` work
+COPY src/ /app/
+
+# Make sure Python can import from /app
+ENV PYTHONPATH=/app
+ENV GALYLEO_PORT=5000
+
+EXPOSE 5000
+
+# (Optional) run as non-root user
+RUN useradd --create-home appuser && chown -R appuser:appuser /app
+USER appuser
+
+# Exec form is important — split the program and args
+# For development you can add "--reload" here, but for production remove it.
+CMD ["uvicorn", "public:app", "--host", "0.0.0.0", "--port", "5000", "--proxy-headers", "--forwarded-allow-ips",  "*"]

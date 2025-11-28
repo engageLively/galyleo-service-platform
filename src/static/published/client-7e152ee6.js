@@ -3101,7 +3101,7 @@ System.register(['./__rootModule___commonjs-entry-7f4eef7f.js'], (function (expo
 
             if (!def) {
               return __varRecorder__.L2LClient.ensure({
-                url: resource(__varRecorder__.determineLocation()).join("/lively-socket.io").url,
+                url: resource(__varRecorder__.determineLocation()).join("/_disabled_lively_socket_io").url,
                 namespace: "l2l",
                 info: info
               });

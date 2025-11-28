@@ -1,4 +1,4 @@
-from google.cloud import datastore
+from google.cloud import datastore # type: ignore
 import os
 from galyleo_object import GalyleoObject
 

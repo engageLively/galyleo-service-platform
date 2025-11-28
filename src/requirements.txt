@@ -1,6 +1,7 @@
 Flask==3.0.3
 pandas
 Werkzeug
+fastapi
 google-cloud-storage
 google-cloud-core
 google-cloud-datastore
@@ -11,3 +12,5 @@ requests
 gunicorn
 user-agents
 flask-cors
+sdtp
+uvicorn

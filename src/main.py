@@ -1,4 +1,4 @@
-from flask import Flask, Response, send_from_directory, make_response, redirect, request, session, abort,  jsonify, render_template, flash # type: ignore # type: ignore
+from flask import Flask, Response, send_from_directory, make_response, redirect, request, session, abort,  jsonify, render_template, flash # type: ignore 
 import requests # type: ignore
 from sdtp import InvalidDataException # type: ignore
  # type: ignore
@@ -59,7 +59,7 @@ GOOGLE_APPLICATION_CREDENTIALS = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
 if GOOGLE_APPLICATION_CREDENTIALS is None:
   _exit_with_error('Error!  GOOGLE_APPLICATION_CREDENTIALS is not set')
 
-if not os.path.exists(GOOGLE_APPLICATION_CREDENTIALS):
+if not os.path.exists(GOOGLE_APPLICATION_CREDENTIALS): # type: ignore
   _exit_with_error(f'Credentials file {GOOGLE_APPLICATION_CREDENTIALS} does not exist')
   
 galyleo_object_manager = GalyleoObjectManager(GOOGLE_PROJECT,GALYLEO_PERMISSIONS_DATABASE, GALYLEO_PERMISSIONS_NAMESPACE, BUCKET_NAME)
@@ -187,7 +187,7 @@ def authenticated(f):
   def decorated(*args, **kwargs):
     
     if "JupyterHub-User" in request.headers:
-      username = username
+      username = request.headers["JupyterHub-User"]
       print(f'Authenticated user {username} from JupyterHub-User')
       return f({"name": username}, *args, **kwargs)
     
@@ -302,7 +302,7 @@ def get_object(user, kind, owner, name):
   if type(result) == dict:
     return jsonify(result)
   else:
-    return jsonify(result.to_dictionary())
+    return jsonify(result.to_dictionary()) # type: ignore
 
 
 
@@ -445,7 +445,7 @@ def _object_from_name(table_name):
     The table name in the form GALYLEO_ROOT_URL/tables/owner/name
   '''
   if table_name.startswith('http'):
-     return make_object_from_url(table_name)
+     return make_object_from_url(table_name, GALYLEO_ROOT_URL)
   elif table_name.startswith('tables'):
     return make_object_from_key(table_name)
   else:
@@ -489,7 +489,7 @@ def get_table_schema(user):
   parms = _get_parameters_get(['table'])
   email = _get_email(user)
   table = _get_table_if_permitted(parms['table'], email)
-  return jsonify(table.schema)
+  return jsonify(table.schema) # type: ignore
   
     
 def _get_table_and_column(user):
@@ -508,7 +508,7 @@ def _get_table_and_column(user):
   parms = _get_parameters_get(['table', 'column'])
   email = _get_email(user)
   table = _get_table_if_permitted(parms['table'], email)
-  if table.column_names().index(parms['column']) < 0:
+  if table.column_names().index(parms['column']) < 0: # type: ignore
      abort(400, f'table {parms["table"]} does not have column {parms["column"]}')
   return {
      "table": table, "column": parms['column']
@@ -586,11 +586,11 @@ def get_filtered_rows(user):
   table = _get_table_if_permitted(parms['table'], email)
   columns = parms['columns'] if 'columns' in parms.keys() else []
   filter = parms['filter'] if 'filter' in parms.keys() else None
-  missing = set(columns) - set(table.column_names())
+  missing = set(columns) - set(table.column_names()) # type: ignore
   if len(missing) > 0:
     abort(400, f'Table {parms["table"]} does not have columns {missing}')
   try:
-    result = jsonify(table.get_filtered_rows(filter, columns))
+    result = jsonify(table.get_filtered_rows(filter, columns)) # type:ignore
     return result
   except InvalidDataException as err:
     abort(400, f'Error {err} in get_filtered_rows')
@@ -755,7 +755,7 @@ def _delete_object(email, next_page):
     try:
       galyleo_object_manager.delete_object(galyleo_object)
     except Exception as error:
-      flash(error.message)
+      flash(error)
   else:
      flash(f'Only {galyleo_object.owner} can delete an object')
   return redirect(next_page)
@@ -799,7 +799,13 @@ def view_table(user):
   email = _get_email(user) if user and type(user) == dict else None
   table_name = request.args.get('table')
   table = _get_object_if_permitted(table_name, email)
-  return render_template('view_table.html', navbar_contents = _gen_navbar('view_tables', email), email=email, table_name=table_name,  schema = table.schema, uuid=str(uuid.uuid4()))
+  return render_template(
+    'view_table.html',
+    navbar_contents = _gen_navbar('view_tables', email),
+    email=email,
+    table_name=table_name,
+    schema = table.schema, #type: ignore
+    uuid=str(uuid.uuid4()))
 
 @app.route("/services/galyleo/view_dashboard_as_json")
 @authenticated

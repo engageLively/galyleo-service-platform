@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Tables{% endblock %}
+{% block head %}
+    {{ super() }}
+    <style type="text/css">
+        .important { color: #336699; }
+    </style>
+  
+{% endblock %}
+{% block content %}
+    <h1>Galyleo Data Plaform Tables</h1>
+        {% for table in tables %}
+            <a href="/view_table?table_id={{ table }}">{{ table }}</a><br>
+        {%  endfor %}
+    
+{% endblock %}
