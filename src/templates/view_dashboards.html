@@ -55,15 +55,18 @@
         {%  endfor %}
        
     </table>
-    <h2>Other Tables</h2>
+    <h2>Other Dashboards</h2>
     <table class="object-table">
         {% for dashboard in dashboards["other"] %}
-            <td>
-                <a href="/services/galyleo/view_dashboard?dashboard={{ dashboard }}">View </a>
-            </td>
-            <td>
-                <a href="/services/galyleo/view_dashboard_as_json?dashboard={{ dashboard }}">View  as JSON</a>
-            </td>
+            {tr}
+                <td> {{ dashboard }} </td>
+                <td>
+                    <a href="/services/galyleo/view_dashboard?dashboard={{ dashboard }}">View</a>
+                </td>
+                <td>
+                    <a href="/services/galyleo/view_dashboard_as_json?dashboard={{ dashboard }}">View  as JSON</a>
+                </td>
+            {/tr}
         {%  endfor %}
     </table>
         
