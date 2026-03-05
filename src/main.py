@@ -419,7 +419,7 @@ def make_dashboard_public(user, name):
   if dashboard_object is not None:
     changed = False
     tables = dashboard_object['tables']
-    for table in tables:
+    for name, table in tables.items():
       try:
         current_url = table['connector']['url']
         if current_url == HUB_URL:
