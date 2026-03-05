@@ -4,4 +4,4 @@ for /f %%t in (
   'powershell -NoProfile -Command "(Get-Date -AsUTC).ToString(\"yyyyMMddHHmmss\")"'
 ) do set TS=%%t
 
-docker build --build-arg CACHE_BUST=%TS%  -t rickmcgeer/galyleo_service_platform:2026.2.20 .
+docker build --build-arg CACHE_BUST=%TS%  -t rickmcgeer/galyleo_service_platform:2026.2.20a .

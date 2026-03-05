@@ -10,6 +10,7 @@ from fastapi.templating import Jinja2Templates # type: ignore
 from fastapi.staticfiles import StaticFiles # type: ignore
 from galyleo_object_manager import GalyleoObjectManager
 import os
+from json import JSONDecodeError, loads, dumps
 from galyleo_object import GalyleoObject,  make_object_from_key, check_or_raise_exception, make_object_from_url, GalyleoBadObjectException
 
 
@@ -17,6 +18,8 @@ GALYLEO_PERMISSIONS_DATABASE = os.environ['GALYLEO_PERMISSIONS_DATABASE']
 GALYLEO_PERMISSIONS_NAMESPACE = os.environ['GALYLEO_PERMISSIONS_NAMESPACE']
 GOOGLE_PROJECT = os.environ['GOOGLE_PROJECT']
 BUCKET_NAME = os.environ['BUCKET_NAME']
+HUB_URL = os.environ['HUB_URL']
+PUBLIC_URL=os.environ['PUBLIC_URL']
 
 
 def _get_accessible_objects(kind, galyleo_object_manager):
@@ -128,10 +131,51 @@ async def get_table(owner, table_id):
   return table
   
 
+
 def _get_dashboard(dashboard_id):
   dashboard = _get_object_if_permitted(dashboard_id)
   if dashboard is None:
     return HTMLResponse(content="Dashboard not found", status_code=404)
+  
+  # Handle both dict and JSON string cases
+  if isinstance(dashboard, str):
+    try:
+      dashboard_dict = loads(dashboard)
+    except JSONDecodeError:
+      return HTMLResponse(content="Invalid dashboard JSON", status_code=400)
+  else:
+    dashboard_dict = dashboard  # already dict
+    
+    # Rewrite table URLs if they point to Hub
+    # Inside _get_dashboard, after normalizing to dashboard_dict
+
+  changed = False
+
+  tables = dashboard_dict.get('tables', {})
+  if isinstance(tables, dict):
+    # tables is {table_id: table_dict}
+    for table_id, table in tables.items():
+      connector = table.get('connector') or table.get('connection') or {}
+      url = connector.get('url')
+      if url and HUB_URL in url:
+        connector['url'] = url.replace(HUB_URL, PUBLIC_URL)
+        changed = True
+  elif isinstance(tables, list):
+    # fallback for list case
+    for table in tables:
+      connector = table.get('connector') or table.get('connection') or {}
+      url = connector.get('url')
+      if url and HUB_URL in url:
+        connector['url'] = url.replace(HUB_URL, PUBLIC_URL)
+        changed = True
+  else:
+    # unexpected type, skip or log
+    pass
+
+# If changed and original was str, re-serialize
+  if changed and isinstance(dashboard, str):
+    return dumps(dashboard_dict)
+
   return dashboard
 
 @app.get('/dashboards/{owner}/{dashboard}')
@@ -173,7 +217,7 @@ async def get_table_schema(request: Request, table = Query(...)):
   }
 
 def get_table_and_column(table, column):
-  table_object = _get_object_if_permitted(table)
+  table_object = _get_object_if_permitted(f'tables/{table}')
   if table_object.column_names().index(column) < 0: # type: ignore
       raise HTTPException(status_code = 404, detail = f'table {table} does not have column {column}')
   return {

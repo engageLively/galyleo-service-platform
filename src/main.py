@@ -40,6 +40,14 @@ BUCKET_NAME = os.environ['BUCKET_NAME']
 JUPYTER_HUB_API_TOKEN = os.environ['JUPYTER_HUB_API_TOKEN']
 GALYLEO_HOST = os.environ.get("GALYLEO_HOST", "http://localhost")
 
+def _default_public_url():
+  # add -public to the first part of the domain
+  parts = HUB_URL.split('.')
+  parts[0] = parts[0] + "-public"
+  return ".".join(parts)
+
+PUBLIC_URL = os.environ.get('PUBLIC_URL', _default_public_url())
+
 app = Flask(__name__, static_url_path = '/services/galyleo/static')
 app.url_map.strict_slashes = False
 app.secret_key = uuid.uuid4().hex
@@ -382,6 +390,49 @@ def publish_dataset(user):
   message = f"The table parameter to {request.url} was not a valid table"
   return _publish_object(email, 'tables', parms['name'], parms['table'], share_set, message)
 
+
+
+@app.route('/services/galyleo/make_table_public')
+@authenticated
+def make_table_public(user, name):
+  email = _get_email(user)
+  object = _get_table_if_permitted(name, user) 
+  if object is None:
+    abort(404, f"Table {name} not found")
+  elif object.owner == email:
+     galyleo_object_manager.update_user_access(object, set({'{PUBLIC}'}))
+     return _show_tables(email)
+  else:
+    abort(403, f"Only {object.owner} can change the permissions of table {name}")
+
+@app.route('/services/galyleo/make_dashboard_public')
+@authenticated
+def make_dashboard_public(user, name):
+  email = _get_email(user)
+  object = _get_object_if_permitted(name, user) 
+  if object is None:
+    abort(404, f"Dashboard {name} not found")
+  elif object.owner != email:
+     abort(403, f"Only {object.owner} can change the permissions of table {name}")
+  galyleo_object_manager.update_user_access(object, set({'{PUBLIC}'}))
+  dashboard_object = galyleo_object_manager.get_object_if_permitted(object, email, email is not None)
+  if dashboard_object is not None:
+    changed = False
+    tables = dashboard_object['tables']
+    for table in tables:
+      try:
+        current_url = table['connector']['url']
+        if current_url == HUB_URL:
+          table['connector']['url'] = PUBLIC_URL
+          changed = True
+      except Exception:
+        pass
+    if changed:
+      _publish_object(email, 'dashboards', name, dashboard_object,  set({'PUBLIC'}), "")
+    return view_dashboards(user)
+
+    
+
 @app.route('/services/galyleo/get_table_names')
 @authenticated
 def get_table_names(user):
@@ -698,13 +749,16 @@ def _return_jsonified_objects(user, kind):
 def list_tables(user):
    return _return_jsonified_objects(user, 'tables')
 
+def _show_tables(email):
+  tables = _get_accessible_objects('tables', email)
+  return render_template('view_tables.html', navbar_contents = _gen_navbar('view_tables', email), email=email, tables=tables, uuid=str(uuid.uuid4()))
 
 @app.route('/services/galyleo/view_tables')
 @authenticated
 def view_tables(user):
    email = _get_email(user) if user else None
-   tables = _get_accessible_objects('tables', email)
-   return render_template('view_tables.html', navbar_contents = _gen_navbar('view_tables', email), email=email, tables=tables, uuid=str(uuid.uuid4()))
+   return _show_tables(email)
+   
 
 
 @app.route('/services/galyleo/list_dashboards')
