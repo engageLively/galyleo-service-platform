@@ -302,11 +302,23 @@ def render_greeting(user):
 def hello(user):
    return repr(user)
 
+def _get_required_tables(dashboard):
+  # Get all the keys to the tables dictionary
+  # for each filter, view, extract the table name
+  # return the table dictionary with only the used keys
+  pass
+
+def _cleanse_dashboard(dashboard):
+  # get the required tables for the dashboard
+  # substitute the required tables for the tables in the dashoard
+  pass
+
 @app.route("/services/galyleo/<kind>/<owner>/<name>")
 @authenticated
 def get_object(user, kind, owner, name):
   email = _get_email(user)
   result = _get_object_or_abort(kind, owner, name, email, user != None)
+  # if result is a dashboard, _cleanse it
   if type(result) == dict:
     return jsonify(result)
   else:

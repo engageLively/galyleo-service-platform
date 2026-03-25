@@ -1,6 +1,6 @@
 # public.py
 
-from fastapi import FastAPI, Request, Query, HTTPException # type: ignore
+from fastapi import FastAPI, Request, Query, HTTPException, WebSocket, WebSocketDisconnect # type: ignore
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from pydantic import BaseModel # type: ignore
 from starlette.responses import Response, PlainTextResponse
@@ -8,6 +8,7 @@ from typing import Optional, List, Dict, Any
 from fastapi.responses import JSONResponse, RedirectResponse, HTMLResponse # type: ignore
 from fastapi.templating import Jinja2Templates # type: ignore
 from fastapi.staticfiles import StaticFiles # type: ignore
+from fastapi.middleware.cors import CORSMiddleware
 from galyleo_object_manager import GalyleoObjectManager
 import os
 from json import JSONDecodeError, loads, dumps
@@ -20,6 +21,17 @@ GOOGLE_PROJECT = os.environ['GOOGLE_PROJECT']
 BUCKET_NAME = os.environ['BUCKET_NAME']
 HUB_URL = os.environ['HUB_URL']
 PUBLIC_URL=os.environ['PUBLIC_URL']
+
+
+
+# The 'world's vote'—pull the public IP or local dev address from the environment
+allowed_origins = [
+    "http://localhost:5000",
+    "http://127.0.0.1:5000",
+    os.getenv("PUBLIC_IP_ADDRESS", ""), # Dynamic placeholder for deployment
+]
+
+
 
 
 def _get_accessible_objects(kind, galyleo_object_manager):
@@ -49,7 +61,8 @@ def render_template(template, request, navbar_link, value_dict):
   template_dict = value_dict.copy()
   template_dict["navbar_contents"] = _gen_navbar(navbar_link)
   template_dict["request"] = request
-  return templates.TemplateResponse(template, template_dict)
+  # Use keyword arguments to ensure they hit the right slots
+  return templates.TemplateResponse(request=request, name=template, context=template_dict)
 
 
 # Point Flask to your templates directory
@@ -57,6 +70,13 @@ app = FastAPI()
 templates = Jinja2Templates(directory="public_templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[origin for origin in allowed_origins if origin],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.middleware("http")
 async def block_socketio_http(request, call_next):
@@ -252,6 +272,21 @@ async def get_filtered_rows(req: FilterRequest):
   table = _get_table_or_abort(req.table)
   return table.get_filtered_rows(filter_spec = req.filter_spec, columns = req.columns,  format = req.result_format) # type: ignore
 
+@app.websocket("/_disabled_lively_socket_io/")
+async def catch_spurious_socket(websocket: WebSocket):
+    # Accept the connection so we can talk to it
+    await websocket.accept()
+    
+    # Log the headers to find the source
+    print(f"Connection headers: {websocket.headers}")
+    
+    try:
+        # Send a message back to the 'ghost' script
+        await websocket.send_text("STOP_CONNECTING")
+        # Or send a close code
+        await websocket.close(code=1000)
+    except Exception as e:
+        print(f"Error handling ghost socket: {e}")
 
 # wrap the ASGI app to reject websocket scopes for that path
 orig_app = app
@@ -335,6 +370,7 @@ async def top_asgi(scope, receive, send):
 
     # For everything else, forward to the real app
     await orig_asgi(scope, receive, send)
+
 
 # Export as the ASGI callable uvicorn imports
 app = top_asgi

@@ -30,8 +30,6 @@ def _get_table_(path, storage_manager):
     "table_dictionary": table_dictionary
   }
 
-
-
   
 class GalyleoNotFoundException(Exception):
   '''
@@ -125,7 +123,9 @@ class GalyleoObjectManager:
   def _get_object(self, galyleo_object):
     try:
       if galyleo_object.kind == 'dashboards':
-        return self.storage_manager.get_object(galyleo_object)
+        dashboard = self.storage_manager.get_object(galyleo_object)
+        self.clean_dashboard(dashboard)
+        return dashboard
       else:  # galyleo_object.kind == 'tables'
         return self.galyleo_table_server.get_table(galyleo_object.object_key)
     except (NotFound, InvalidDataException):
@@ -183,7 +183,25 @@ class GalyleoObjectManager:
     from the data.  For now, everytbing is valid
     '''
     pass
-  
+
+  def clean_dashboard(self, dashboard):
+    if not 'tables' in dashboard:
+      return
+    chart_references = [
+      chart['viewOrTable'] if 'viewOrTable' in chart else None for chart in dashboard['charts'].values()
+    ]
+    view_references = [
+      view['table'] if 'table' in view else None for view in dashboard['views'].values()
+    ]
+    filter_references = [
+      filt['savedForm']['tableName'] if 'tableName' in filt['savedForm'] else None if 'savedForm' in filt else None for filt in dashboard['filters'].values() 
+    ]
+    table_references = set(chart_references + view_references + filter_references)
+    used_tables = [(name, table) for (name, table) in dashboard['tables'].items() if name in table_references]
+    dashboard['tables'] = {}
+    for (name, table) in used_tables:
+      dashboard['tables'][name] = table
+
   def publish_object(self, galyleo_object,  object_data, share_set = set()):
     '''
     Put an object in the repository galyleo.object_key
@@ -203,6 +221,7 @@ class GalyleoObjectManager:
     object_to_load = loads(object_to_write)
     if galyleo_object.kind == 'dashboards':
       self._validate_dashboard(object_to_load)
+      self.clean_dashboard(object_to_load)
     if galyleo_object.kind == 'tables':
       self._validate_table(object_to_load)
       self.galyleo_table_server.add_sdtp_table_from_dictionary(galyleo_object.object_key, object_to_load)

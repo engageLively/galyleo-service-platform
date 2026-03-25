@@ -174,3 +174,4 @@ cython_debug/
 .keys/
 Pipfile
 set_vars.bat
+run-public.bat

@@ -1,8 +1,8 @@
 import fnmatch
 import os
 from json import load, loads, dump, dumps, JSONDecodeError
-from google.cloud import storage
-from google.cloud.exceptions import NotFound
+from google.cloud import storage # type: ignore
+from google.cloud.exceptions import NotFound # type: ignore
 from galyleo_object import GalyleoObject
 
 class GalyleoStorageManager:
