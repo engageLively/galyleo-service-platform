@@ -1,5 +1,7 @@
 from urllib.parse import urlparse
 
+DISPLAY_DELIM = "\u00B7"  # ·
+
 class GalyleoObject:
   '''
   A Galyleo Object is a three-tuple: kind, owner, name.  Its URL is derived from this:
@@ -20,19 +22,25 @@ class GalyleoObject:
       owner: the user who owns the object
       name: the name of the object
     '''
-    
     self.kind = kind
     self.owner = owner
     self.name = name
     self.object_key = f'{kind}/{owner}/{name}'
-   
 
+  def display_name(self):
+    '''
+    Return the name of the object for the UI in the form owner/name or
+    name·owner for a table (UI prefers name·owner so the name appears
+    first in the pulldown)
+    '''
+    return f'{self.name}{DISPLAY_DELIM}{self.owner}' if self.kind == 'tables' else f'{self.owner}/{self.name}'
+   
+  def __eq__(self, other):
+    if not isinstance(other, GalyleoObject):
+        return NotImplemented
+    return self.kind == other.kind and self.owner == other.owner and self.name == other.name
   
-  def eq(self, galyleo_object):
-    return self.kind == galyleo_object.kind and self.owner == galyleo_object.owner and self.name == galyleo_object.name
-  
-  
-  
+
 class GalyleoBadObjectException(Exception):
   '''
   An attempt to create a bad object (bad URL, bad kind...)
@@ -43,32 +51,83 @@ class GalyleoBadObjectException(Exception):
     self.message = f'Bad object {url}: {reason}'
     super().__init__(self.message)
 
-def check_or_raise_exception(input, kind, name):
-  '''
-  kind must be dasboards or tables
-  name must end with .gd.json if kind is dashboards, .sdml if kind is tables
-  Parameters:
-    input: original string
-    kind: kind of the object
-    name: name of the object
-  Returns:
-    No return
-  Raises:
-    GalyleoBadObjectException
-  '''
-  suffixes = {'dashboards': '.gd.json', 'tables': '.sdml'}
-  if kind in suffixes.keys():
-    if name.endswith(suffixes[kind]): return
-    raise GalyleoBadObjectException(input, f'Objects of type {kind} must end with {suffixes[kind]} and {name} does not')
-  raise GalyleoBadObjectException(input, f'Objects must be of type dashboards or tables, not {kind}')
+import re
 
+
+def is_valid_kind_and_name(kind, name):
+  '''
+  Return (True, None) if kind is a valid kind and name ends with
+  the appropriate suffix, (False, msg) otherwise
+  Parameters:
+    kind: the kind of the object
+    name: the name of the object
+  Returns
+    (True, None) if kind is a valid kind and name ends with
+    the appropriate suffix, (False, msg) otherwise
+  '''
+  suffix = {'dashboards': '.gd.json', 'tables': '.sdml'}
+  if not kind in suffix.keys():
+    return (False, f'kind must be one of {suffix.keys()}, not {kind}')
+  if not name.endswith(suffix[kind]):
+    return (False, f'{name} does now end with {suffix[kind]}')
+  return (True, None)
+
+
+def get_kind_owner_name(parts, input):
+  '''
+  Get the parts of a GalyleoObject from the input, which must be an iterable
+  with three items  Returns a record
+  {"kind": "name": "owner": } or throws an exception if it can't be parsed
+  Accepts:
+      <kind>/<owner>/<name>
+      <kind>/<name>·<owner>   (DISPLAY_DELIM = "·")
+  Parameters:
+    parts: a triple (list, tuple) with the input parts
+    input: the original input string
+  Returns:
+    An object of the form {kind, owner, name}
+  Raises:
+    GalyleoBadObjectException if there is a malformed input string
+  '''
+  msg = f'''
+    Input must be in the form <kind>/<owner>/<name> OR <kind>/<name>{DISPLAY_DELIM}<owner>,
+    where kind is one of 'tables', 'dashboards', and name ends with .gd.json 
+    if kind == 'dashboards' and '.sdml' if kind == 'tables'. The input was {input}.
+  '''
+  suffix = {'dashboards': '.gd.json', 'tables': '.sdml'}
+
+  if len(parts) not in (2, 3):
+    raise GalyleoBadObjectException(input, msg)
+
+  kind = parts[0]
+  if kind not in suffix:
+    raise GalyleoBadObjectException(input, msg)
+
+  if len(parts) == 2:
+    if kind != "tables":
+      raise GalyleoBadObjectException(input, msg)
+    subparts = parts[1].split(DISPLAY_DELIM, 1)
+    if len(subparts) != 2:
+      raise GalyleoBadObjectException(input, msg)
+    name = subparts[0].strip()
+    owner = subparts[1].strip()
+  else:
+    owner = parts[1]
+    name = parts[2]
+
+  if not name.endswith(suffix[kind]):
+    raise GalyleoBadObjectException(input, msg)
+
+  return {"kind": kind, "owner": owner, "name": name}
+  
+  
 def make_object_from_key(object_key):
   '''
   Given an object key, make a GalyleoObject from it.  The key must be of the form
-  <kind>/<owner>/<name> and the name must have the appropriate suffix (.sdml
+  <kind>/<owner>/<name> or <kind>/<name>/<owner> and the name must have the appropriate suffix (.sdml
   for a table, .gd.json for a dashboard)
   Parameters:
-    object_key: a string of the form  <kind>/<owner>/<name> 
+    object_key: a string of the form  <kind>/<owner>/<name> or <kind>/<name>/<owner> 
   Returns: 
     the GalyleoObject whose key matches object_key
   Raises:
@@ -76,14 +135,8 @@ def make_object_from_key(object_key):
   '''
   
   parts = object_key.split('/')
-  if len(parts) != 3:
-    # 4, not three, because component.path always starts with a /
-    raise GalyleoBadObjectException(object_key, f'Object keys must be of the form <tables or dashboards>/<owner>/<name>')
-  kind = parts[0]
-  owner = parts[1]
-  name = parts[2]
-  check_or_raise_exception(object_key, kind, name)
-  return GalyleoObject(kind, owner, name)
+  record = get_kind_owner_name(parts, object_key)
+  return GalyleoObject(record["kind"], record["owner"], record["name"])
   
 def make_object_from_url(url, galyleo_root_url):
   '''
@@ -99,13 +152,8 @@ def make_object_from_url(url, galyleo_root_url):
   if f'{components.scheme}://{components.netloc}' != galyleo_root_url:
     raise GalyleoBadObjectException(url, f'Object urls must start with {galyleo_root_url}, not {components.scheme}/{components.netloc}')
   parts = components.path.split('/')
-  if len(parts) != 4:
-    # 4, not three, because component.path always starts with a /
-    raise GalyleoBadObjectException(url, f'Object urls must be of the form {galyleo_root_url}/<tables or dashboards>/<owner>/<name>')
-  kind = parts[1]
-  owner = parts[2]
-  name = parts[3]
-  check_or_raise_exception(url, kind, name)
-  return GalyleoObject(kind, owner, name)
+  record = get_kind_owner_name(parts[1:], url)
+  return GalyleoObject(record["kind"], record["owner"], record["name"])
+  
 
 

@@ -262,7 +262,7 @@ class GalyleoObjectManager:
 
   def get_table_info(self, user, user_is_hub_user):
     '''
-    Get the URLs/schemas of the tables that this user can access.  
+    Get the names/schemas of the tables that this user can access.  
     Parameters:
       user: user asking for table info
       user_is_hub_user: True iff the user is a registered user of the hub

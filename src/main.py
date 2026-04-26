@@ -6,7 +6,7 @@ import os
 from jupyterhub.services.auth import HubOAuth, HubAuth # type: ignore
 from functools import wraps
 from json import loads, dumps, JSONDecodeError
-from galyleo_object import GalyleoObject, make_object_from_url, make_object_from_key, check_or_raise_exception, make_object_from_url, GalyleoBadObjectException
+from galyleo_object import GalyleoObject, make_object_from_url, make_object_from_key, make_object_from_url, is_valid_kind_and_name, GalyleoBadObjectException
 import permissions
 import user_agents # type: ignore
 import uuid
@@ -211,7 +211,9 @@ def authenticated(f):
     
     if "Authorization" in request.headers:
       auth_header = request.headers.get("Authorization")
-      auth_header = auth_header.strip()
+      auth_header = auth_header.strip() if auth_header is not None else None
+      if not auth_header:
+        return f(None, *args, **kwargs)
       if auth_header.startswith("token "):
         user_token = _get_bearer_token(auth_header)
         user = get_user_from_token(user_token)
@@ -260,7 +262,9 @@ def serve_static_page(filename):
 
 def _get_object_or_abort(kind, owner, name, user, user_is_hub_user):
   try:
-    check_or_raise_exception(request.base_url, kind, name)
+    (valid, msg) = is_valid_kind_and_name(kind, name)
+    if not valid:
+      abort(404, f'{msg}: {request.base_url}')
     object = GalyleoObject(kind, owner, name)
     return galyleo_object_manager.get_object_if_permitted(object, user , user_is_hub_user)
   except (GalyleoNotFoundException, GalyleoNotPermittedException, GalyleoBadObjectException) as err:
@@ -406,42 +410,53 @@ def publish_dataset(user):
 
 @app.route('/services/galyleo/make_table_public')
 @authenticated
-def make_table_public(user, name):
+def make_table_public(user):
   email = _get_email(user)
-  object = _get_table_if_permitted(name, user) 
-  if object is None:
-    abort(404, f"Table {name} not found")
-  elif object.owner == email:
-     galyleo_object_manager.update_user_access(object, set({'{PUBLIC}'}))
+  name = request.args.get('name')
+  galyleo_object = _object_from_name(name)  # returns a GalyleoObject
+  # confirm it exists and user can access it (will abort with 400/403/404)
+  _ = galyleo_object_manager.get_object_if_permitted(galyleo_object, email, email is not None)
+
+  if galyleo_object.owner == email:
+     galyleo_object_manager.update_user_access(galyleo_object, set({'{PUBLIC}'}))
      return _show_tables(email)
   else:
-    abort(403, f"Only {object.owner} can change the permissions of table {name}")
+    abort(403, f"Only {galyleo_object.owner} can change the permissions of table {name}")
 
 @app.route('/services/galyleo/make_dashboard_public')
 @authenticated
-def make_dashboard_public(user, name):
+def make_dashboard_public(user):
   email = _get_email(user)
-  object = _get_object_if_permitted(name, user) 
-  if object is None:
-    abort(404, f"Dashboard {name} not found")
-  elif object.owner != email:
-     abort(403, f"Only {object.owner} can change the permissions of table {name}")
-  galyleo_object_manager.update_user_access(object, set({'{PUBLIC}'}))
-  dashboard_object = galyleo_object_manager.get_object_if_permitted(object, email, email is not None)
-  if dashboard_object is not None:
-    changed = False
-    tables = dashboard_object['tables']
-    for name, table in tables.items():
-      try:
-        current_url = table['connector']['url']
-        if current_url == HUB_URL:
-          table['connector']['url'] = PUBLIC_URL
-          changed = True
-      except Exception:
-        pass
-    if changed:
-      _publish_object(email, 'dashboards', name, dashboard_object,  set({'PUBLIC'}), "")
-    return view_dashboards(user)
+  name = request.args.get('name')
+  if not name:
+    abort(400, "Missing required query parameter 'name'")
+
+  galyleo_object = make_object_from_key(name)  # this is the GalyleoObject
+  if galyleo_object.owner != email:
+    abort(403, f"Only {galyleo_object.owner} can change the permissions of dashboard {name}")
+
+  # ensure it exists and is accessible before changing perms / rewriting URLs
+  dashboard_object = galyleo_object_manager.get_object_if_permitted(galyleo_object, email, email is not None)
+
+
+  galyleo_object_manager.update_user_access(galyleo_object, set({'{PUBLIC}'}))
+
+  # rewrite connector URLs from HUB -> PUBLIC, then republish if changed
+  changed = False
+  tables = dashboard_object.get('tables', {}) # type: ignore (dashboard_object is not None)
+  for _, table in (tables.items() if isinstance(tables, dict) else []):
+    try:
+      current_url = table['connector']['url']
+      if current_url == HUB_URL:
+        table['connector']['url'] = PUBLIC_URL
+        changed = True
+    except Exception:
+      pass
+
+  if changed:
+    _publish_object(email, 'dashboards', galyleo_object.name, dashboard_object, set({'PUBLIC'}), "")
+
+  return view_dashboards(user)
 
     
 
@@ -449,7 +464,7 @@ def make_dashboard_public(user, name):
 @authenticated
 def get_table_names(user):
   '''
-  Target for the /get_table_names route.  Returns the list of urls of tables hosted by this server, as a simple list of strings.
+  Target for the /get_table_names route.  Returns the list of names of tables hosted by this server, as a simple list of strings.
   Shows only the tables accessible to this user.
   Parameters:
       user: the user requesting the table names
@@ -457,13 +472,13 @@ def get_table_names(user):
   '''
   email = _get_email(user)
   info = galyleo_object_manager.get_table_info(email, email != None)
-  return jsonify([key for key in info.keys()])
+  return jsonify([make_object_from_key(key).display_name() for key in info.keys()])
 
 @app.route('/services/galyleo/get_table_schemas')
 @authenticated
 def get_table_schemas(user):
   '''
-  Target for the /get_table_names route.  Returns the list of urls of tables hosted by this server, as a simple list of strings.
+  Target for the /get_table_schemas route.  Returns the list of schemas of tables hosted by this server, as a simple list of strings.
   Shows only the tables accessible to this user.
   Parameters:
       user: the user requesting the table names
@@ -471,7 +486,12 @@ def get_table_schemas(user):
   
   '''
   email = _get_email(user)
-  info = galyleo_object_manager.get_table_info(email, email != None)
+  raw_info = galyleo_object_manager.get_table_info(email, email != None)
+  info = {}
+  for (key, table) in raw_info.items():
+    name = make_object_from_key(key).display_name()
+    info[name] = table
+
   return jsonify(info)
 
 def _get_parameters_get(required, optional = []):
@@ -793,7 +813,7 @@ def view_dashboards(user):
 @app.route('/services/galyleo/login')
 @authenticated
 def login(user):
-  pass
+  return redirect('/services/galyleo/greeting')
 
 def _upload_object(kind, user, next_page):
   owner = _get_email(user)
@@ -821,7 +841,7 @@ def _delete_object(email, next_page):
     try:
       galyleo_object_manager.delete_object(galyleo_object)
     except Exception as error:
-      flash(error)
+      flash(str(error) if str(error) else f"Error in deleting {galyleo_object.display_name()}")
   else:
      flash(f'Only {galyleo_object.owner} can delete an object')
   return redirect(next_page)
@@ -908,7 +928,8 @@ def view_dashboard(user):
 def share_object(user):
   email = _get_email(user)
   object_name = request.form.get('object_name')
-  selected_users = loads(request.form.get('share_list'))
+  user_list = request.form.get('share_list')
+  selected_users = loads(user_list) if user_list is not None else []
   if bool(request.form.get('hub_shared')):
         selected_users.append(permissions.HUB)
   if bool(request.form.get('public_shared')):
@@ -917,7 +938,7 @@ def share_object(user):
   galyleo_object_manager.update_user_access(galyleo_object, set(selected_users))
   prev_page = request.form.get('prev_page')
   # return jsonify({'email': email, 'object_name': object_name, 'selected_users': selected_users})
-  return redirect(prev_page)
+  return redirect(prev_page if prev_page is not None else '/services/galyleo/greeting')
 
 def _show_share_form(user, next_url):
   name = request.args['name']
@@ -955,4 +976,4 @@ def show_share_dashboard_form(user):
 
 
 if __name__ == '__main__':
-  app.run(host='0.0.0.0', port=os.getenv('GALYLEO_PORT', 80))
+  app.run(host='0.0.0.0', port=int(os.getenv('GALYLEO_PORT', 80)))

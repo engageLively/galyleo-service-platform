@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from galyleo_object_manager import GalyleoObjectManager
 import os
 from json import JSONDecodeError, loads, dumps
-from galyleo_object import GalyleoObject,  make_object_from_key, check_or_raise_exception, make_object_from_url, GalyleoBadObjectException
+from galyleo_object import GalyleoObject,  make_object_from_key, make_object_from_url, GalyleoBadObjectException
 
 
 GALYLEO_PERMISSIONS_DATABASE = os.environ['GALYLEO_PERMISSIONS_DATABASE']
@@ -87,9 +87,21 @@ async def block_socketio_http(request, call_next):
   return await call_next(request)
 
 
+def _object_from_name(name: str):
+  # Accept either:
+  #   tables/<owner>/<name>.sdml
+  #   <owner>/<name>.sdml
+  #   <name>.sdml/<owner>      (display form)
+  # and rely on make_object_from_key / galyleo_object parsing to disambiguate.
+  if name.startswith("http"):
+    # If you don’t need URL form in public service, you can drop this branch.
+    return make_object_from_url(name, PUBLIC_URL)
+  if name.startswith("tables/") or name.startswith("dashboards/"):
+    return make_object_from_key(name)
+  return make_object_from_key(f"tables/{name}")
 
 def _get_object_if_permitted(name):
-  galyleo_object = make_object_from_key(name)
+  galyleo_object = _object_from_name(name)
   return galyleo_object_manager.get_object_if_permitted(galyleo_object, None, False)
 
 
@@ -147,7 +159,7 @@ def _get_table(table_id):
 async def get_table(owner, table_id):
   table = _get_table(f'tables/{owner}/{table_id}')
   if table is None:
-    return HTMLResponse(content="Dashboard not found", status_code=404)
+    return HTMLResponse(content="Table not found", status_code=404)
   return table
   
 
@@ -171,7 +183,7 @@ def _get_dashboard(dashboard_id):
 
   changed = False
 
-  tables = dashboard_dict.get('tables', {})
+  tables = dashboard_dict.get('tables', {}) # type: ignore
   if isinstance(tables, dict):
     # tables is {table_id: table_dict}
     for table_id, table in tables.items():
@@ -216,12 +228,16 @@ async def view_dashboard(request: Request, dashboard_id: str = Query(...)):
 
 @app.get("/get_table_names")
 async def get_table_names():
-  table_objects = _get_accessible_objects('tables', galyleo_object_manager)
-  return [table.object_key for table in table_objects]
+  table_paths = _get_accessible_objects('tables', galyleo_object_manager)
+  return [make_object_from_key(path).display_name() for path in table_paths]
 
 @app.get("/get_tables")
 async def get_tables():
-  return galyleo_object_manager.get_table_info(None, False)
+  raw_info = galyleo_object_manager.get_table_info(None, False)
+  info = {}
+  for key, table in raw_info.items():
+    info[make_object_from_key(key).display_name()] = table
+  return info
   
 def _get_table_or_abort(table):
   table_object = _get_object_if_permitted(table)
@@ -237,7 +253,7 @@ async def get_table_schema(request: Request, table = Query(...)):
   }
 
 def get_table_and_column(table, column):
-  table_object = _get_object_if_permitted(f'tables/{table}')
+  table_object = _get_table_or_abort(table)
   if table_object.column_names().index(column) < 0: # type: ignore
       raise HTTPException(status_code = 404, detail = f'table {table} does not have column {column}')
   return {

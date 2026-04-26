@@ -15,7 +15,7 @@ def test_make_object_from_url():
     galyleo_object = GalyleoObject('tables', 'test', name)
     assert galyleo_object.object_key == f'tables/test/{name}'
     galyleo_object_1 = make_object_from_url(f'{url}/tables/test/{name}', url)
-    assert galyleo_object.eq(galyleo_object_1)
+    assert galyleo_object.__eq__(galyleo_object_1)
 
 def test_make_object_from_key():
   for name in test_tables:
@@ -23,5 +23,5 @@ def test_make_object_from_key():
     key = f'tables/test/{name}'
     assert galyleo_object.object_key == key
     galyleo_object_1 = make_object_from_key(key)
-    assert galyleo_object.eq(galyleo_object_1)
+    assert galyleo_object.__eq__(galyleo_object_1)
 
