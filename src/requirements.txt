@@ -12,5 +12,4 @@ requests
 gunicorn
 user-agents
 flask-cors
-sdtp
 uvicorn

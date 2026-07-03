@@ -1,0 +1,161 @@
+{
+  "fill": "Color.white",
+  "tables": {
+    "sales": {
+      "columns": [
+        { "name": "region", "type": "string" },
+        { "name": "product", "type": "string" },
+        { "name": "quarter", "type": "string" },
+        { "name": "revenue", "type": "number" },
+        { "name": "units", "type": "number" }
+      ],
+      "rows": [
+        ["North", "Widget A", "Q1", 120000, 400],
+        ["North", "Widget A", "Q2", 135000, 450],
+        ["North", "Widget B", "Q1",  95000, 320],
+        ["North", "Widget B", "Q2", 110000, 370],
+        ["South", "Widget A", "Q1",  98000, 330],
+        ["South", "Widget A", "Q2", 115000, 385],
+        ["South", "Widget B", "Q1",  72000, 240],
+        ["South", "Widget B", "Q2",  88000, 295],
+        ["East",  "Widget A", "Q1", 143000, 477],
+        ["East",  "Widget A", "Q2", 158000, 527],
+        ["East",  "Widget B", "Q1", 107000, 357],
+        ["East",  "Widget B", "Q2", 122000, 407],
+        ["West",  "Widget A", "Q1", 131000, 437],
+        ["West",  "Widget A", "Q2", 147000, 490],
+        ["West",  "Widget B", "Q1",  99000, 330],
+        ["West",  "Widget B", "Q2", 114000, 380]
+      ]
+    }
+  },
+  "views": {
+    "revenue_by_product": {
+      "table": "sales",
+      "columns": ["product", "revenue"],
+      "filterNames": ["region_filter", "quarter_filter"]
+    },
+    "units_by_quarter": {
+      "table": "sales",
+      "columns": ["quarter", "units"],
+      "filterNames": ["region_filter", "revenue_chart"]
+    }
+  },
+  "filters": {
+    "region_filter": {
+      "morphIndex": 0,
+      "savedForm": {
+        "filterType": "Select",
+        "columnName": "region",
+        "tableName": "sales",
+        "isString": true,
+        "selection": "North",
+        "choices": [
+          { "isListItem": true, "string": "North", "value": "North" },
+          { "isListItem": true, "string": "South", "value": "South" },
+          { "isListItem": true, "string": "East",  "value": "East"  },
+          { "isListItem": true, "string": "West",  "value": "West"  }
+        ],
+        "part": null
+      },
+      "morphicProperties": {
+        "position": { "x": 40, "y": 40 },
+        "extent":   { "x": 160, "y": 36 },
+        "rotation": 0, "scale": 1, "opacity": 1,
+        "clipMode": "visible",
+        "fill": "rgba(255,255,255,1)",
+        "border": { "style": "solid", "width": 1, "color": { "all": "rgba(200,200,200,1)" }, "radius": 4 },
+        "origin": { "x": 0, "y": 0 }
+      }
+    },
+    "quarter_filter": {
+      "morphIndex": 1,
+      "savedForm": {
+        "filterType": "Select",
+        "columnName": "quarter",
+        "tableName": "sales",
+        "isString": true,
+        "selection": "Q1",
+        "choices": [
+          { "isListItem": true, "string": "Q1", "value": "Q1" },
+          { "isListItem": true, "string": "Q2", "value": "Q2" }
+        ],
+        "part": null
+      },
+      "morphicProperties": {
+        "position": { "x": 220, "y": 40 },
+        "extent":   { "x": 120, "y": 36 },
+        "rotation": 0, "scale": 1, "opacity": 1,
+        "clipMode": "visible",
+        "fill": "rgba(255,255,255,1)",
+        "border": { "style": "solid", "width": 1, "color": { "all": "rgba(200,200,200,1)" }, "radius": 4 },
+        "origin": { "x": 0, "y": 0 }
+      }
+    }
+  },
+  "charts": {
+    "revenue_chart": {
+      "chartType": "BarChart",
+      "viewOrTable": "revenue_by_product",
+      "morphIndex": 2,
+      "options": {
+        "legend": { "position": "none" },
+        "bar": { "groupWidth": "75%" },
+        "colors": ["#4A90D9"]
+      },
+      "morphicProperties": {
+        "position": { "x": 40, "y": 100 },
+        "extent":   { "x": 460, "y": 280 },
+        "rotation": 0, "scale": 1, "opacity": 1,
+        "clipMode": "visible",
+        "fill": "rgba(255,255,255,0)",
+        "border": { "style": "solid", "width": 0, "color": {}, "radius": 0 },
+        "origin": { "x": 0, "y": 0 }
+      }
+    },
+    "units_chart": {
+      "chartType": "ColumnChart",
+      "viewOrTable": "units_by_quarter",
+      "morphIndex": 3,
+      "options": {
+        "legend": { "position": "none" },
+        "colors": ["#E8A838"]
+      },
+      "morphicProperties": {
+        "position": { "x": 520, "y": 100 },
+        "extent":   { "x": 380, "y": 280 },
+        "rotation": 0, "scale": 1, "opacity": 1,
+        "clipMode": "visible",
+        "fill": "rgba(255,255,255,0)",
+        "border": { "style": "solid", "width": 0, "color": {}, "radius": 0 },
+        "origin": { "x": 0, "y": 0 }
+      }
+    }
+  },
+  "morphs": {
+    "title": {
+      "type": "Text",
+      "name": "title",
+      "morphIndex": 4,
+      "textString": "Sales Dashboard",
+      "textProperties": {
+        "fontSize": 22,
+        "fontWeight": "bold",
+        "fontStyle": "normal",
+        "color": "#2c2c2c",
+        "textAlign": "left",
+        "fontFamily": "sans-serif"
+      },
+      "morphicProperties": {
+        "position": { "x": 40, "y": 6 },
+        "extent":   { "x": 300, "y": 30 },
+        "rotation": 0, "scale": 1, "opacity": 1,
+        "clipMode": "visible",
+        "fill": "rgba(255,255,255,0)",
+        "border": { "style": "solid", "width": 0, "color": {}, "radius": 0 },
+        "origin": { "x": 0, "y": 0 }
+      }
+    }
+  },
+  "numMorphs": 5
+}

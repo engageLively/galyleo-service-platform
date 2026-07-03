@@ -1,17 +1,17 @@
-from flask import Flask, Response, send_from_directory, make_response, redirect, request, session, abort,  jsonify, render_template, flash # type: ignore 
+from flask import Flask, send_from_directory, make_response, redirect, request, session, abort, jsonify, render_template, flash # type: ignore
 import requests # type: ignore
 from sdtp import InvalidDataException # type: ignore
- # type: ignore
 import os
-from jupyterhub.services.auth import HubOAuth, HubAuth # type: ignore
+from jupyterhub.services.auth import HubOAuth # type: ignore
 from functools import wraps
 from json import loads, dumps, JSONDecodeError
-from galyleo_object import GalyleoObject, make_object_from_url, make_object_from_key, make_object_from_url, is_valid_kind_and_name, GalyleoBadObjectException
+from galyleo_object import GalyleoObject, make_object_from_url, make_object_from_key, is_valid_kind_and_name, GalyleoBadObjectException
 import permissions
 import user_agents # type: ignore
 import uuid
+import io
+import csv
 from flask_cors import CORS # type: ignore
-# from utils import backup_users
 import datetime
 import logging
 import sys
@@ -27,18 +27,16 @@ from galyleo_object_manager import GalyleoObjectManager, GalyleoNotFoundExceptio
   # must agree with the secret key  for Galyleo in the hub's config.yaml
 
 HUB_API_URL = os.environ['JUPYTERHUB_API_URL']
-SERVICE_API_TOKEN =  os.environ['GALYLEO_SERVICE_API_TOKEN'] # must agree with the service API token for Galyleo in the hub's config.yaml
-HUB_URL  = os.environ['JUPYTERHUB_URL'] 
-GALYLEO_CLIENT_ID = os.environ['GALYLEO_CLIENT_ID'] 
+SERVICE_API_TOKEN = os.environ['GALYLEO_SERVICE_API_TOKEN']
+HUB_URL = os.environ['JUPYTERHUB_URL']
+GALYLEO_CLIENT_ID = os.environ['GALYLEO_CLIENT_ID']
 OAUTH_CALLBACK_URL = '/services/galyleo/callback'
-# OAUTH_CALLBACK_URL = '/callback'
 GALYLEO_ROOT_URL = os.environ['GALYLEO_ROOT_URL']
 GALYLEO_PERMISSIONS_DATABASE = os.environ['GALYLEO_PERMISSIONS_DATABASE']
 GALYLEO_PERMISSIONS_NAMESPACE = os.environ['GALYLEO_PERMISSIONS_NAMESPACE']
 GOOGLE_PROJECT = os.environ['GOOGLE_PROJECT']
 BUCKET_NAME = os.environ['BUCKET_NAME']
-JUPYTER_HUB_API_TOKEN = os.environ['JUPYTER_HUB_API_TOKEN']
-GALYLEO_HOST = os.environ.get("GALYLEO_HOST", "http://localhost")
+GALYLEO_EDITOR_URL = os.environ.get('GALYLEO_EDITOR_URL', 'https://engagelively.github.io/galyleo-dashboard/')
 
 def _default_public_url():
   # add -public to the first part of the domain
@@ -88,17 +86,11 @@ CALLBACK_URI = _sanitize_callback()
 
 print(f'Callback URL: {CALLBACK_URI}')
 auth = HubOAuth(
-    api_url = HUB_API_URL,
+    api_url=HUB_API_URL,
     api_token=SERVICE_API_TOKEN,
-    oauth_client_id = GALYLEO_CLIENT_ID,
-    oauth_redirect_uri = CALLBACK_URI,
-    # oauth_redirect_uri = f'{GALYLEO_HOST}{OAUTH_CALLBACK_URL}',
+    oauth_client_id=GALYLEO_CLIENT_ID,
+    oauth_redirect_uri=CALLBACK_URI,
     cache_max_age=60)
-
-token_auth = HubAuth(
-    api_url = HUB_API_URL,
-    api_token=SERVICE_API_TOKEN
-  )
 
 def is_browser(user_agent):
     ua = user_agents.parse(user_agent)
@@ -148,12 +140,6 @@ def oauth_callback():
     response = make_response(redirect(next_url))
     return response
 
-def _list_users():
-  headers = {'Authorization': f'token {SERVICE_API_TOKEN}'}
-  result = requests.get(f'{HUB_API_URL}/users', headers=headers)
-  print(headers)
-  return result.json()
-
 def get_user_from_token(user_token):
     print('Getting user from API token')
     headers = {"Authorization": f"token {user_token}"}
@@ -172,83 +158,42 @@ def _get_bearer_token(auth_header):
   parts =[part for part in parts if len(part) > 0 and part != "token"]
   return parts[0]
 
-from urllib.parse import urlparse
-import re
-
-def _get_user_from_forwarded_path():
-    forwarded_path = request.headers.get("X-Forwarded-Path", "")
-    match = re.match(r"^/user/([^/]+)/", forwarded_path)
-    if match:
-        return match.group(1)
-    return None
-
-def _is_request_from_hub_proxy():
-    """Verify request comes from trusted proxy by checking X-Forwarded-Host."""
-    forwarded_host = request.headers.get("X-Forwarded-Host", "")
-    hub_host = urlparse(HUB_URL).netloc
-    return forwarded_host == hub_host
-
 def authenticated(f):
-  """Decorator for authenticating with the Hub via OAuth"""
+  """Decorator for authenticating with the Hub via OAuth or bearer token."""
 
   @wraps(f)
   def decorated(*args, **kwargs):
-    
+    # JupyterHub internal proxy sets this header — fastest path
     if "JupyterHub-User" in request.headers:
       username = request.headers["JupyterHub-User"]
-      print(f'Authenticated user {username} from JupyterHub-User')
       return f({"name": username}, *args, **kwargs)
-    
-    if _is_request_from_hub_proxy():
-      user_from_path = _get_user_from_forwarded_path()
-      if user_from_path:
-          print(f'Authenticated user {user_from_path} from X-Forwarded-Path')
-          # User authenticated from /user/<username> in URL
-          return f({"name": user_from_path}, *args, **kwargs)
-    
+
     if DEBUG:
       return f(DEBUG_USER, *args, **kwargs)
-    
+
+    # Programmatic API access with a user bearer token
     if "Authorization" in request.headers:
-      auth_header = request.headers.get("Authorization")
-      auth_header = auth_header.strip() if auth_header is not None else None
-      if not auth_header:
-        return f(None, *args, **kwargs)
+      auth_header = (request.headers.get("Authorization") or "").strip()
       if auth_header.startswith("token "):
-        user_token = _get_bearer_token(auth_header)
-        user = get_user_from_token(user_token)
+        user = get_user_from_token(_get_bearer_token(auth_header))
         if user:
           return f(user, *args, **kwargs)
-      
-    token = session.get("token")
 
-    if token:
-      user = auth.user_for_token(token)
-    else:
-      user = None
+    # Browser OAuth session
+    token = session.get("token")
+    user = auth.user_for_token(token) if token else None
 
     if user:
-      print(f'Got user {repr(user)} from token')
       return f(user, *args, **kwargs)
     elif oauth_ok():
-      # redirect to login url on failed auth
-      print("Attempting oauth")
       state = auth.generate_state(next_url=request.path)
       response = make_response(redirect(auth.login_url + f'&state={state}'))
       response.set_cookie(auth.state_cookie_name, state)
-      print(f"OAuth success, returning {repr(response)}")
       return response
     else:
-      print("OAuth failed, returning {}")
-      return f({}, *args, **kwargs) # Call f with an empty user
+      return f({}, *args, **kwargs)
 
   return decorated
-
-# app = Flask(
-#   __name__,
-#   static_url_path="/services/galyleo/static",
-#   static_folder="static"
-# )
 
 def _get_email(user):
   try:
@@ -256,9 +201,35 @@ def _get_email(user):
   except Exception:
     return None
 
+@app.route("/services/galyleo/static/studio")
+@app.route("/services/galyleo/static/studio/")
+def serve_studio():
+  return send_from_directory(os.path.join(app.root_path, "static", "studio"), "index.html")
+
 @app.route("/services/galyleo/static/<path:filename>")
 def serve_static_page(filename):
-  return send_from_directory("static", filename)
+  static_dir = os.path.join(app.root_path, "static")
+  full_path = os.path.join(static_dir, filename.rstrip('/'))
+  if os.path.isdir(full_path):
+    return send_from_directory(static_dir, os.path.join(filename.rstrip('/'), 'index.html'))
+  return send_from_directory(static_dir, filename)
+
+@app.route("/services/galyleo/config")
+@authenticated
+def get_config(user):
+  '''
+  Returns hub-level editor configuration consumed by the React app.
+  PUBLISH_SERVER_URL: where dashboards are published (defaults to this service).
+  TABLE_SERVER_URLS:  comma-separated list of SDTP server base URLs available
+                      as table sources in the editor.
+  '''
+  publish_server = os.getenv('PUBLISH_SERVER_URL', GALYLEO_ROOT_URL)
+  raw_table_servers = os.getenv('TABLE_SERVER_URLS', GALYLEO_ROOT_URL)
+  table_servers = [u.strip() for u in raw_table_servers.split(',') if u.strip()]
+  return jsonify({
+    'publishServer': publish_server,
+    'tableServers': table_servers,
+  })
 
 def _get_object_or_abort(kind, owner, name, user, user_is_hub_user):
   try:
@@ -914,14 +885,33 @@ def view_dashboard_as_json(user):
 @app.route('/services/galyleo/view_dashboard')
 @authenticated
 def view_dashboard(user):
-  email =_get_email(user) if user and type(user) == dict else None
+  email = _get_email(user) if user and type(user) == dict else None
   dashboard_name = request.args.get('dashboard')
   galyleo_object = make_object_from_key(dashboard_name)
   if galyleo_object_manager.object_access_permitted(galyleo_object, email, email is not None):
-    return redirect(f'/services/galyleo/static/published/index.html?dashboard={HUB_URL}/services/galyleo/{dashboard_name}') 
+    dashboard_url = f'{GALYLEO_ROOT_URL}/services/galyleo/{dashboard_name}'
+    return redirect(f'{GALYLEO_EDITOR_URL}?dashboard={dashboard_url}')
   else:
     flash(f'User {email} does not have permission to access {dashboard_name}')
     return redirect('/services/galyleo/view_dashboards')
+
+@app.route('/services/galyleo/download_table')
+@authenticated
+def download_table(user):
+  parms = _get_parameters_get(['table'])
+  email = _get_email(user)
+  table = _get_table_if_permitted(parms['table'], email)
+  schema = table.schema
+  rows = table.get_filtered_rows(None, [])
+  output = io.StringIO()
+  writer = csv.writer(output)
+  writer.writerow([col['name'] for col in schema])
+  writer.writerows(rows)
+  table_name = parms['table'].split('/')[-1].replace('.sdml', '')
+  response = make_response(output.getvalue())
+  response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+  response.headers['Content-Disposition'] = f'attachment; filename="{table_name}.csv"'
+  return response
 
 @app.route('/services/galyleo/share_object', methods=['POST'])
 @authenticated

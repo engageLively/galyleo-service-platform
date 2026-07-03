@@ -1,6 +1,6 @@
 # public.py
 
-from fastapi import FastAPI, Request, Query, HTTPException, WebSocket, WebSocketDisconnect # type: ignore
+from fastapi import FastAPI, Request, Query, HTTPException # type: ignore
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from pydantic import BaseModel # type: ignore
 from starlette.responses import Response, PlainTextResponse
@@ -20,7 +20,8 @@ GALYLEO_PERMISSIONS_NAMESPACE = os.environ['GALYLEO_PERMISSIONS_NAMESPACE']
 GOOGLE_PROJECT = os.environ['GOOGLE_PROJECT']
 BUCKET_NAME = os.environ['BUCKET_NAME']
 HUB_URL = os.environ['HUB_URL']
-PUBLIC_URL=os.environ['PUBLIC_URL']
+PUBLIC_URL = os.environ['PUBLIC_URL']
+GALYLEO_EDITOR_URL = os.environ.get('GALYLEO_EDITOR_URL', 'https://engagelively.github.io/galyleo-dashboard/')
 
 
 
@@ -221,10 +222,27 @@ async def view_dashboard_as_json(request: Request, dashboard_id: str = Query(...
 
 @app.get("/view_dashboard")
 async def view_dashboard(request: Request, dashboard_id: str = Query(...)):
-  url = request.url_for("static", path="published/index.html")
-  base_url = str(request.base_url)
-  dashboard_name = f'{base_url}{dashboard_id}'
-  return RedirectResponse(f'{url}?dashboard={dashboard_name}')
+  base_url = str(request.base_url).rstrip('/')
+  dashboard_url = f'{base_url}/{dashboard_id}'
+  return RedirectResponse(f'{GALYLEO_EDITOR_URL}?dashboard={dashboard_url}')
+
+@app.get("/download_table")
+async def download_table(table: str = Query(...)):
+  import io, csv
+  from fastapi.responses import StreamingResponse
+  table_object = _get_table_or_abort(table)
+  schema = table_object.schema
+  rows = table_object.get_filtered_rows(None, [])
+  output = io.StringIO()
+  writer = csv.writer(output)
+  writer.writerow([col['name'] for col in schema])
+  writer.writerows(rows)
+  table_name = table.split('/')[-1].replace('.sdml', '')
+  return StreamingResponse(
+    iter([output.getvalue()]),
+    media_type='text/csv',
+    headers={'Content-Disposition': f'attachment; filename="{table_name}.csv"'}
+  )
 
 @app.get("/get_table_names")
 async def get_table_names():
@@ -288,105 +306,3 @@ async def get_filtered_rows(req: FilterRequest):
   table = _get_table_or_abort(req.table)
   return table.get_filtered_rows(filter_spec = req.filter_spec, columns = req.columns,  format = req.result_format) # type: ignore
 
-@app.websocket("/_disabled_lively_socket_io/")
-async def catch_spurious_socket(websocket: WebSocket):
-    # Accept the connection so we can talk to it
-    await websocket.accept()
-    
-    # Log the headers to find the source
-    print(f"Connection headers: {websocket.headers}")
-    
-    try:
-        # Send a message back to the 'ghost' script
-        await websocket.send_text("STOP_CONNECTING")
-        # Or send a close code
-        await websocket.close(code=1000)
-    except Exception as e:
-        print(f"Error handling ghost socket: {e}")
-
-# wrap the ASGI app to reject websocket scopes for that path
-orig_app = app
-
-async def app_wrapper(scope, receive, send):
-  if scope["type"] == "websocket" and scope.get("path", "").startswith("/lively-socket.io"):
-    # close immediately with normal closure
-    await send({"type": "websocket.close", "code": 1000})
-    return
-  await orig_app(scope, receive, send)
-
-app = app_wrapper  # export this as the ASGI app
-
-# --- top-level ASGI guard: short-circuit /lively-socket.io handshake (HTTP + WebSocket) ---
-# This wrapper sits above the existing app wrapper and returns 204 for Engine.IO handshake
-# requests and closes WebSocket upgrades on that path so engine.io never logs 403s.
-orig_asgi = app  # keep the current ASGI app (app_wrapper or socketio wrapper)
-# --- top-level ASGI guard: short-circuit /lively-socket.io handshake (HTTP + WebSocket) ---
-# Insert this AFTER any `app_wrapper` and AFTER any `app = app_wrapper` or socketio wrapper lines.
-# It must be executed last so it is the top-level ASGI callable uvicorn imports.
-
-import logging as _logging_for_lively_guard
-import sys as _sys_for_lively_guard
-
-_lively_logger = _logging_for_lively_guard.getLogger("lively_guard")
-_lively_logger.setLevel(_logging_for_lively_guard.DEBUG)
-if not _lively_logger.handlers:
-    _ch = _logging_for_lively_guard.StreamHandler(_sys_for_lively_guard.stdout)
-    _ch.setLevel(_logging_for_lively_guard.DEBUG)
-    _fmt = _logging_for_lively_guard.Formatter("%(asctime)s %(levelname)s %(name)s [pid=%(process)d]: %(message)s")
-    _ch.setFormatter(_fmt)
-    _lively_logger.addHandler(_ch)
-_lively_logger.propagate = False
-
-# orig_asgi should be set to the ASGI app you intend to forward normal requests to
-orig_asgi = app
-
-async def top_asgi(scope, receive, send):
-    path = (scope.get("path") or "") or ""
-    t = scope.get("type")
-
-    # If the request is targeted at lively socket path, handle it entirely here
-    if "lively-socket.io" in path:
-        _lively_logger.debug("top_asgi hit for path=%r type=%r", path, t)
-
-        if t == "http":
-            # Inspect headers to see if client is asking to Upgrade to websocket
-            headers = dict((k.lower(), v) for k, v in (scope.get("headers") or []))
-            upgrade = headers.get(b'upgrade', b'').lower()
-            if upgrade == b'websocket':
-                # This is the HTTP upgrade handshake — short-circuit it and DO NOT forward.
-                # Returning 204 here prevents engine.io from generating a 403.
-                await send({
-                    "type": "http.response.start",
-                    "status": 204,
-                    "headers": [],
-                })
-                await send({"type": "http.response.body", "body": b""})
-                return
-            else:
-                # Not an upgrade request: return 204 as a quiet rejection
-                await send({
-                    "type": "http.response.start",
-                    "status": 204,
-                    "headers": [],
-                })
-                await send({"type": "http.response.body", "body": b""})
-                return
-
-        if t == "websocket":
-            # We are already in the websocket scope. Accept then close immediately
-            # (this yields a normal lifecycle and prevents engine.io from logging 403).
-            try:
-                await send({"type": "websocket.accept"})
-            except Exception:
-                # If accept is not supported by this server, ignore the exception and still try to close.
-                pass
-            # now close cleanly
-            await send({"type": "websocket.close", "code": 1000})
-            return
-
-    # For everything else, forward to the real app
-    await orig_asgi(scope, receive, send)
-
-
-# Export as the ASGI callable uvicorn imports
-app = top_asgi

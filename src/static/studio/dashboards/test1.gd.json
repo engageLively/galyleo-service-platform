@@ -1,0 +1,826 @@
+{
+  "fill": "Color.white",
+  "tables": {
+    "nationwide_vote": {
+      "columns": [
+        {
+          "name": "Year",
+          "type": "number"
+        },
+        {
+          "name": "Party",
+          "type": "string"
+        },
+        {
+          "name": "Percentage",
+          "type": "number"
+        }
+      ],
+      "connector": {
+        "url": "http://localhost:5000",
+        "remoteName": "nationwide_vote"
+      }
+    },
+    "presidential_margins": {
+      "columns": [
+        {
+          "name": "State",
+          "type": "string"
+        },
+        {
+          "name": "Year",
+          "type": "number"
+        },
+        {
+          "name": "Margin",
+          "type": "number"
+        }
+      ],
+      "connector": {
+        "url": "http://localhost:5000",
+        "remoteName": "presidential_margins"
+      }
+    },
+    "presidential_vote": {
+      "columns": [
+        {
+          "name": "Year",
+          "type": "number"
+        },
+        {
+          "name": "State",
+          "type": "string"
+        },
+        {
+          "name": "Name",
+          "type": "string"
+        },
+        {
+          "name": "Party",
+          "type": "string"
+        },
+        {
+          "name": "Votes",
+          "type": "number"
+        },
+        {
+          "name": "Percentage",
+          "type": "number"
+        }
+      ],
+      "connector": {
+        "url": "http://localhost:5000",
+        "remoteName": "presidential_vote"
+      }
+    }
+  },
+  "views": {
+    "margin": {
+      "table": "presidential_margins",
+      "columns": [
+        "State",
+        "Margin"
+      ],
+      "filterNames": [
+        "year_filter_slider"
+      ]
+    },
+    "state_vote": {
+      "table": "presidential_vote",
+      "columns": [
+        "Party",
+        "Percentage"
+      ],
+      "filterNames": [
+        "year_filter_slider",
+        "margin"
+      ]
+    }
+  },
+  "charts": {
+    "margin": {
+      "chartType": "GeoChart",
+      "viewOrTable": "margin",
+      "morphIndex": 0,
+      "options": {
+        "legacyScatterChartLabels": true,
+        "legend": "right",
+        "displayMode": "regions",
+        "booleanRole": "certainty",
+        "colors": [
+          "#DC3912",
+          "#EFE6DC",
+          "#0000ff"
+        ],
+        "defaultColor": "#000000",
+        "vAxes": [
+          {
+            "viewWindow": {
+              "max": null,
+              "min": null
+            },
+            "minValue": null,
+            "maxValue": null,
+            "useFormatFromData": true
+          },
+          {
+            "viewWindow": {
+              "max": null,
+              "min": null
+            },
+            "minValue": null,
+            "maxValue": null,
+            "useFormatFromData": true
+          }
+        ],
+        "hAxis": {
+          "viewWindow": {
+            "max": null,
+            "min": null
+          },
+          "minValue": null,
+          "maxValue": null,
+          "useFormatFromData": true
+        },
+        "width": 600,
+        "height": 371,
+        "region": "US",
+        "resolution": "provinces",
+        "datalessRegionColor": "#000000"
+      },
+      "morphicProperties": {
+        "position": {
+          "x": 456,
+          "y": 127
+        },
+        "extent": {
+          "x": 400,
+          "y": 300
+        },
+        "rotation": 0,
+        "scale": 1,
+        "opacity": 1,
+        "clipMode": "visible",
+        "fill": "rgba(255,255,255,0)",
+        "border": {
+          "style": "solid",
+          "width": 0,
+          "color": {},
+          "radius": 0
+        },
+        "origin": {
+          "x": 0,
+          "y": 0
+        }
+      }
+    },
+    "stave_vote_chart": {
+      "chartType": "BarChart",
+      "viewOrTable": "state_vote",
+      "morphIndex": 0,
+      "options": {
+        "width": 600,
+        "height": 371,
+        "legacyScatterChartLabels": true,
+        "isStacked": false,
+        "booleanRole": "certainty",
+        "hAxis": {
+          "useFormatFromData": true,
+          "viewWindow": {
+            "max": null,
+            "min": null
+          },
+          "minValue": null,
+          "maxValue": null
+        },
+        "vAxes": [
+          {
+            "useFormatFromData": true,
+            "minValue": null,
+            "maxValue": null,
+            "viewWindow": null,
+            "viewWindowMode": null
+          },
+          {
+            "useFormatFromData": true
+          }
+        ],
+        "legend": "right"
+      },
+      "morphicProperties": {
+        "position": {
+          "x": 40,
+          "y": 100
+        },
+        "extent": {
+          "x": 400,
+          "y": 300
+        },
+        "rotation": 0,
+        "scale": 1,
+        "opacity": 1,
+        "clipMode": "visible",
+        "fill": "rgba(255,255,255,0)",
+        "border": {
+          "style": "solid",
+          "width": 0,
+          "color": {},
+          "radius": 0
+        },
+        "origin": {
+          "x": 0,
+          "y": 0
+        }
+      }
+    }
+  },
+  "filters": {
+    "year_filter_slider": {
+      "savedForm": {
+        "filterType": "Select",
+        "columnName": "Year",
+        "tableName": "presidential_margins",
+        "isString": false,
+        "selection": 1828,
+        "choices": [
+          {
+            "isListItem": true,
+            "string": "1828",
+            "value": 1828
+          },
+          {
+            "isListItem": true,
+            "string": "1832",
+            "value": 1832
+          },
+          {
+            "isListItem": true,
+            "string": "1836",
+            "value": 1836
+          },
+          {
+            "isListItem": true,
+            "string": "1840",
+            "value": 1840
+          },
+          {
+            "isListItem": true,
+            "string": "1844",
+            "value": 1844
+          },
+          {
+            "isListItem": true,
+            "string": "1848",
+            "value": 1848
+          },
+          {
+            "isListItem": true,
+            "string": "1852",
+            "value": 1852
+          },
+          {
+            "isListItem": true,
+            "string": "1856",
+            "value": 1856
+          },
+          {
+            "isListItem": true,
+            "string": "1860",
+            "value": 1860
+          },
+          {
+            "isListItem": true,
+            "string": "1864",
+            "value": 1864
+          },
+          {
+            "isListItem": true,
+            "string": "1868",
+            "value": 1868
+          },
+          {
+            "isListItem": true,
+            "string": "1872",
+            "value": 1872
+          },
+          {
+            "isListItem": true,
+            "string": "1876",
+            "value": 1876
+          },
+          {
+            "isListItem": true,
+            "string": "1880",
+            "value": 1880
+          },
+          {
+            "isListItem": true,
+            "string": "1884",
+            "value": 1884
+          },
+          {
+            "isListItem": true,
+            "string": "1888",
+            "value": 1888
+          },
+          {
+            "isListItem": true,
+            "string": "1892",
+            "value": 1892
+          },
+          {
+            "isListItem": true,
+            "string": "1896",
+            "value": 1896
+          },
+          {
+            "isListItem": true,
+            "string": "1900",
+            "value": 1900
+          },
+          {
+            "isListItem": true,
+            "string": "1904",
+            "value": 1904
+          },
+          {
+            "isListItem": true,
+            "string": "1908",
+            "value": 1908
+          },
+          {
+            "isListItem": true,
+            "string": "1912",
+            "value": 1912
+          },
+          {
+            "isListItem": true,
+            "string": "1916",
+            "value": 1916
+          },
+          {
+            "isListItem": true,
+            "string": "1920",
+            "value": 1920
+          },
+          {
+            "isListItem": true,
+            "string": "1924",
+            "value": 1924
+          },
+          {
+            "isListItem": true,
+            "string": "1928",
+            "value": 1928
+          },
+          {
+            "isListItem": true,
+            "string": "1932",
+            "value": 1932
+          },
+          {
+            "isListItem": true,
+            "string": "1936",
+            "value": 1936
+          },
+          {
+            "isListItem": true,
+            "string": "1940",
+            "value": 1940
+          },
+          {
+            "isListItem": true,
+            "string": "1944",
+            "value": 1944
+          },
+          {
+            "isListItem": true,
+            "string": "1948",
+            "value": 1948
+          },
+          {
+            "isListItem": true,
+            "string": "1952",
+            "value": 1952
+          },
+          {
+            "isListItem": true,
+            "string": "1956",
+            "value": 1956
+          },
+          {
+            "isListItem": true,
+            "string": "1960",
+            "value": 1960
+          },
+          {
+            "isListItem": true,
+            "string": "1964",
+            "value": 1964
+          },
+          {
+            "isListItem": true,
+            "string": "1968",
+            "value": 1968
+          },
+          {
+            "isListItem": true,
+            "string": "1972",
+            "value": 1972
+          },
+          {
+            "isListItem": true,
+            "string": "1976",
+            "value": 1976
+          },
+          {
+            "isListItem": true,
+            "string": "1980",
+            "value": 1980
+          },
+          {
+            "isListItem": true,
+            "string": "1984",
+            "value": 1984
+          },
+          {
+            "isListItem": true,
+            "string": "1988",
+            "value": 1988
+          },
+          {
+            "isListItem": true,
+            "string": "1992",
+            "value": 1992
+          },
+          {
+            "isListItem": true,
+            "string": "1996",
+            "value": 1996
+          },
+          {
+            "isListItem": true,
+            "string": "2000",
+            "value": 2000
+          },
+          {
+            "isListItem": true,
+            "string": "2004",
+            "value": 2004
+          },
+          {
+            "isListItem": true,
+            "string": "2008",
+            "value": 2008
+          },
+          {
+            "isListItem": true,
+            "string": "2012",
+            "value": 2012
+          },
+          {
+            "isListItem": true,
+            "string": "2016",
+            "value": 2016
+          },
+          {
+            "isListItem": true,
+            "string": "2020",
+            "value": 2020
+          }
+        ],
+        "part": null
+      },
+      "morphIndex": 0,
+      "morphicProperties": {
+        "position": {
+          "x": 499,
+          "y": 553.5
+        },
+        "extent": {
+          "x": 200,
+          "y": 36
+        },
+        "rotation": 0,
+        "scale": 1,
+        "opacity": 1,
+        "clipMode": "visible",
+        "fill": "rgba(255,255,255,1)",
+        "border": {
+          "style": "solid",
+          "width": 1,
+          "color": {
+            "all": "rgba(200,200,200,1)"
+          },
+          "radius": 4
+        },
+        "origin": {
+          "x": 0,
+          "y": 0
+        }
+      }
+    },
+    "state_filter": {
+      "savedForm": {
+        "filterType": "Select",
+        "columnName": "State",
+        "tableName": "presidential_margins",
+        "isString": true,
+        "selection": "Alabama",
+        "choices": [
+          {
+            "isListItem": true,
+            "string": "Alabama",
+            "value": "Alabama"
+          },
+          {
+            "isListItem": true,
+            "string": "Alaska",
+            "value": "Alaska"
+          },
+          {
+            "isListItem": true,
+            "string": "Arizona",
+            "value": "Arizona"
+          },
+          {
+            "isListItem": true,
+            "string": "Arkansas",
+            "value": "Arkansas"
+          },
+          {
+            "isListItem": true,
+            "string": "California",
+            "value": "California"
+          },
+          {
+            "isListItem": true,
+            "string": "Colorado",
+            "value": "Colorado"
+          },
+          {
+            "isListItem": true,
+            "string": "Connecticut",
+            "value": "Connecticut"
+          },
+          {
+            "isListItem": true,
+            "string": "Delaware",
+            "value": "Delaware"
+          },
+          {
+            "isListItem": true,
+            "string": "Florida",
+            "value": "Florida"
+          },
+          {
+            "isListItem": true,
+            "string": "Georgia",
+            "value": "Georgia"
+          },
+          {
+            "isListItem": true,
+            "string": "Hawaii",
+            "value": "Hawaii"
+          },
+          {
+            "isListItem": true,
+            "string": "Idaho",
+            "value": "Idaho"
+          },
+          {
+            "isListItem": true,
+            "string": "Illinois",
+            "value": "Illinois"
+          },
+          {
+            "isListItem": true,
+            "string": "Indiana",
+            "value": "Indiana"
+          },
+          {
+            "isListItem": true,
+            "string": "Iowa",
+            "value": "Iowa"
+          },
+          {
+            "isListItem": true,
+            "string": "Kansas",
+            "value": "Kansas"
+          },
+          {
+            "isListItem": true,
+            "string": "Kentucky",
+            "value": "Kentucky"
+          },
+          {
+            "isListItem": true,
+            "string": "Louisiana",
+            "value": "Louisiana"
+          },
+          {
+            "isListItem": true,
+            "string": "Maine",
+            "value": "Maine"
+          },
+          {
+            "isListItem": true,
+            "string": "Maryland",
+            "value": "Maryland"
+          },
+          {
+            "isListItem": true,
+            "string": "Massachusetts",
+            "value": "Massachusetts"
+          },
+          {
+            "isListItem": true,
+            "string": "Michigan",
+            "value": "Michigan"
+          },
+          {
+            "isListItem": true,
+            "string": "Minnesota",
+            "value": "Minnesota"
+          },
+          {
+            "isListItem": true,
+            "string": "Mississippi",
+            "value": "Mississippi"
+          },
+          {
+            "isListItem": true,
+            "string": "Missouri",
+            "value": "Missouri"
+          },
+          {
+            "isListItem": true,
+            "string": "Montana",
+            "value": "Montana"
+          },
+          {
+            "isListItem": true,
+            "string": "Nationwide",
+            "value": "Nationwide"
+          },
+          {
+            "isListItem": true,
+            "string": "Nebraska",
+            "value": "Nebraska"
+          },
+          {
+            "isListItem": true,
+            "string": "Nevada",
+            "value": "Nevada"
+          },
+          {
+            "isListItem": true,
+            "string": "New Hampshire",
+            "value": "New Hampshire"
+          },
+          {
+            "isListItem": true,
+            "string": "New Jersey",
+            "value": "New Jersey"
+          },
+          {
+            "isListItem": true,
+            "string": "New Mexico",
+            "value": "New Mexico"
+          },
+          {
+            "isListItem": true,
+            "string": "New York",
+            "value": "New York"
+          },
+          {
+            "isListItem": true,
+            "string": "North Carolina",
+            "value": "North Carolina"
+          },
+          {
+            "isListItem": true,
+            "string": "North Dakota",
+            "value": "North Dakota"
+          },
+          {
+            "isListItem": true,
+            "string": "Ohio",
+            "value": "Ohio"
+          },
+          {
+            "isListItem": true,
+            "string": "Oklahoma",
+            "value": "Oklahoma"
+          },
+          {
+            "isListItem": true,
+            "string": "Oregon",
+            "value": "Oregon"
+          },
+          {
+            "isListItem": true,
+            "string": "Pennsylvania",
+            "value": "Pennsylvania"
+          },
+          {
+            "isListItem": true,
+            "string": "Rhode Island",
+            "value": "Rhode Island"
+          },
+          {
+            "isListItem": true,
+            "string": "South Carolina",
+            "value": "South Carolina"
+          },
+          {
+            "isListItem": true,
+            "string": "South Dakota",
+            "value": "South Dakota"
+          },
+          {
+            "isListItem": true,
+            "string": "Tennessee",
+            "value": "Tennessee"
+          },
+          {
+            "isListItem": true,
+            "string": "Texas",
+            "value": "Texas"
+          },
+          {
+            "isListItem": true,
+            "string": "Utah",
+            "value": "Utah"
+          },
+          {
+            "isListItem": true,
+            "string": "Vermont",
+            "value": "Vermont"
+          },
+          {
+            "isListItem": true,
+            "string": "Virginia",
+            "value": "Virginia"
+          },
+          {
+            "isListItem": true,
+            "string": "Washington",
+            "value": "Washington"
+          },
+          {
+            "isListItem": true,
+            "string": "Washington DC",
+            "value": "Washington DC"
+          },
+          {
+            "isListItem": true,
+            "string": "West Virginia",
+            "value": "West Virginia"
+          },
+          {
+            "isListItem": true,
+            "string": "Wisconsin",
+            "value": "Wisconsin"
+          },
+          {
+            "isListItem": true,
+            "string": "Wyoming",
+            "value": "Wyoming"
+          }
+        ],
+        "part": null
+      },
+      "morphIndex": 0,
+      "morphicProperties": {
+        "position": {
+          "x": 20,
+          "y": 20
+        },
+        "extent": {
+          "x": 200,
+          "y": 36
+        },
+        "rotation": 0,
+        "scale": 1,
+        "opacity": 1,
+        "clipMode": "visible",
+        "fill": "rgba(255,255,255,1)",
+        "border": {
+          "style": "solid",
+          "width": 1,
+          "color": {
+            "all": "rgba(200,200,200,1)"
+          },
+          "radius": 4
+        },
+        "origin": {
+          "x": 0,
+          "y": 0
+        }
+      }
+    }
+  },
+  "morphs": {},
+  "numMorphs": 0
+}

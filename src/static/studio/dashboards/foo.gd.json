@@ -1,0 +1,111 @@
+{
+  "fill": "Color.white",
+  "tables": {},
+  "views": {},
+  "charts": {},
+  "filters": {},
+  "morphs": {
+    "aMorph": {
+      "type": "Morph",
+      "name": "aMorph",
+      "morphIndex": 0,
+      "morphicProperties": {
+        "rotation": 0,
+        "scale": 1,
+        "clipMode": "visible",
+        "opacity": 1,
+        "position": {
+          "x": 161.4871612548828,
+          "y": 91.91216125488282
+        },
+        "extent": {
+          "x": 355.0000457763672,
+          "y": 207.77778625488278
+        },
+        "fill": "rgba(255,0,255,1)",
+        "border": {
+          "style": {
+            "top": "solid",
+            "left": "solid",
+            "bottom": "solid",
+            "right": "solid"
+          },
+          "width": {
+            "left": 1,
+            "right": 1,
+            "top": 1,
+            "bottom": 1
+          },
+          "color": {
+            "top": {
+              "r": 0.0902,
+              "g": 0.6275,
+              "b": 0.9843,
+              "a": 1
+            },
+            "left": {
+              "r": 0.0902,
+              "g": 0.6275,
+              "b": 0.9843,
+              "a": 1
+            },
+            "right": {
+              "r": 0.0902,
+              "g": 0.6275,
+              "b": 0.9843,
+              "a": 1
+            },
+            "bottom": {
+              "r": 0.0902,
+              "g": 0.6275,
+              "b": 0.9843,
+              "a": 1
+            }
+          },
+          "radius": {
+            "topLeft": 0,
+            "topRight": 0,
+            "bottomRight": 0,
+            "bottomLeft": 0
+          }
+        },
+        "origin": {
+          "x": 0,
+          "y": 0
+        }
+      }
+    },
+    "image_1": {
+      "type": "Image",
+      "name": "image_1",
+      "morphIndex": 0,
+      "imageUrl": "https://galyleo-user-docs.readthedocs.io/en/latest/_images/galyleo-logo.png",
+      "morphicProperties": {
+        "position": {
+          "x": 992,
+          "y": 506
+        },
+        "extent": {
+          "x": 200,
+          "y": 150
+        },
+        "rotation": 0,
+        "scale": 1,
+        "opacity": 1,
+        "clipMode": "visible",
+        "fill": "rgba(255,255,255,0)",
+        "border": {
+          "style": "solid",
+          "width": 0,
+          "color": {},
+          "radius": 0
+        },
+        "origin": {
+          "x": 0,
+          "y": 0
+        }
+      }
+    }
+  },
+  "numMorphs": 1
+}
