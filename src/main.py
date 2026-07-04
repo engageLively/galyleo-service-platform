@@ -9,8 +9,6 @@ from galyleo_object import GalyleoObject, make_object_from_url, make_object_from
 import permissions
 import user_agents # type: ignore
 import uuid
-import io
-import csv
 from flask_cors import CORS # type: ignore
 import datetime
 import logging
@@ -36,7 +34,7 @@ GALYLEO_PERMISSIONS_DATABASE = os.environ['GALYLEO_PERMISSIONS_DATABASE']
 GALYLEO_PERMISSIONS_NAMESPACE = os.environ['GALYLEO_PERMISSIONS_NAMESPACE']
 GOOGLE_PROJECT = os.environ['GOOGLE_PROJECT']
 BUCKET_NAME = os.environ['BUCKET_NAME']
-GALYLEO_EDITOR_URL = os.environ.get('GALYLEO_EDITOR_URL', 'https://engagelively.github.io/galyleo-dashboard/')
+GALYLEO_STUDIO_URL = os.environ.get('GALYLEO_STUDIO_URL', f'{GALYLEO_ROOT_URL}/static/studio/')
 
 def _default_public_url():
   # add -public to the first part of the domain
@@ -856,12 +854,15 @@ def view_table(user):
   email = _get_email(user) if user and type(user) == dict else None
   table_name = request.args.get('table')
   table = _get_object_if_permitted(table_name, email)
+  all_rows = table.get_filtered_rows(None, []) #type: ignore
   return render_template(
     'view_table.html',
     navbar_contents = _gen_navbar('view_tables', email),
     email=email,
     table_name=table_name,
-    schema = table.schema, #type: ignore
+    schema=table.schema, #type: ignore
+    num_rows=len(all_rows),
+    preview_rows=all_rows[:20],
     uuid=str(uuid.uuid4()))
 
 @app.route("/services/galyleo/view_dashboard_as_json")
@@ -889,8 +890,8 @@ def view_dashboard(user):
   dashboard_name = request.args.get('dashboard')
   galyleo_object = make_object_from_key(dashboard_name)
   if galyleo_object_manager.object_access_permitted(galyleo_object, email, email is not None):
-    dashboard_url = f'{GALYLEO_ROOT_URL}/services/galyleo/{dashboard_name}'
-    return redirect(f'{GALYLEO_EDITOR_URL}?dashboard={dashboard_url}')
+    dashboard_url = f'{GALYLEO_ROOT_URL}/{dashboard_name}'
+    return redirect(f'{GALYLEO_STUDIO_URL}?dashboard={dashboard_url}')
   else:
     flash(f'User {email} does not have permission to access {dashboard_name}')
     return redirect('/services/galyleo/view_dashboards')
@@ -901,16 +902,30 @@ def download_table(user):
   parms = _get_parameters_get(['table'])
   email = _get_email(user)
   table = _get_table_if_permitted(parms['table'], email)
-  schema = table.schema
-  rows = table.get_filtered_rows(None, [])
-  output = io.StringIO()
-  writer = csv.writer(output)
-  writer.writerow([col['name'] for col in schema])
-  writer.writerows(rows)
-  table_name = parms['table'].split('/')[-1].replace('.sdml', '')
-  response = make_response(output.getvalue())
-  response.headers['Content-Type'] = 'text/csv; charset=utf-8'
-  response.headers['Content-Disposition'] = f'attachment; filename="{table_name}.csv"'
+  sdml = dumps({"schema": table.schema, "rows": table.get_filtered_rows(None, [])}, indent=2)
+  base_name = parms['table'].split('/')[-1]
+  filename = base_name if base_name.endswith('.sdml') else base_name + '.sdml'
+  response = make_response(sdml)
+  response.headers['Content-Type'] = 'application/json; charset=utf-8'
+  response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+  return response
+
+@app.route('/services/galyleo/download_dashboard')
+@authenticated
+def download_dashboard(user):
+  parms = _get_parameters_get(['dashboard'])
+  email = _get_email(user)
+  galyleo_object = make_object_from_key(parms['dashboard'])
+  try:
+    dashboard_object = galyleo_object_manager.get_object_if_permitted(galyleo_object, email, email is not None)
+  except GalyleoNotPermittedException as err:
+    abort(403, err.message)
+  except GalyleoNotFoundException as err:
+    abort(404, err.message)
+  filename = galyleo_object.name if galyleo_object.name.endswith('.json') else galyleo_object.name + '.json'
+  response = make_response(dumps(dashboard_object, indent=2))
+  response.headers['Content-Type'] = 'application/json; charset=utf-8'
+  response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
   return response
 
 @app.route('/services/galyleo/share_object', methods=['POST'])

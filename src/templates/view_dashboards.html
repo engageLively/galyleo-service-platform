@@ -37,13 +37,16 @@
                     <a href="/services/galyleo/view_dashboard?dashboard={{ dashboard }}">View </a>
                 </td>
                 <td>
-                    <a href="/services/galyleo/view_dashboard_as_json?dashboard={{ dashboard }}">View  as JSON</a>
+                    <a href="/services/galyleo/view_dashboard_as_json?dashboard={{ dashboard }}">View as JSON</a>
+                </td>
+                <td>
+                    <a href="/services/galyleo/download_dashboard?dashboard={{ dashboard }}"><button>Download JSON</button></a>
                 </td>
                 <td>
                     <a href="/services/galyleo/share_dashboard?name={{ dashboard }}"><button>Share</button></a>
                 </td>
                 <td>
-                    <a href="/services/galyleo/delete_dashboard_confirm?name={{ dashboard }}"><button>Delete {{ dashboard }}</button></a>
+                    <a href="/services/galyleo/delete_dashboard_confirm?name={{ dashboard }}"><button>Delete</button></a>
                     <!--
                     {% set dashboard_string = "'" + dashboard + "'" %}
                     {% set call = '"confirmAndDelete(' + dashboard_string  + ');"' %}
@@ -64,7 +67,10 @@
                     <a href="/services/galyleo/view_dashboard?dashboard={{ dashboard }}">View</a>
                 </td>
                 <td>
-                    <a href="/services/galyleo/view_dashboard_as_json?dashboard={{ dashboard }}">View  as JSON</a>
+                    <a href="/services/galyleo/view_dashboard_as_json?dashboard={{ dashboard }}">View as JSON</a>
+                </td>
+                <td>
+                    <a href="/services/galyleo/download_dashboard?dashboard={{ dashboard }}"><button>Download JSON</button></a>
                 </td>
             </tr>
         {%  endfor %}

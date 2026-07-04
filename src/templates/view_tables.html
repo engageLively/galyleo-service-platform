@@ -32,10 +32,13 @@
                     <a href="/services/galyleo/view_table?table={{ table }}">View {{ table }}</a>
                 </td>
                 <td>
-                    <a href="/services/galyleo/share_table?name={{ table }}"><button>Share {{ table }}</button></a>
+                    <a href="/services/galyleo/download_table?table={{ table }}"><button>Download SDML</button></a>
                 </td>
                 <td>
-                    <a href="/services/galyleo/delete_table_confirm?name={{ table }}"><button>Delete {{ table }}</button></a>
+                    <a href="/services/galyleo/share_table?name={{ table }}"><button>Share</button></a>
+                </td>
+                <td>
+                    <a href="/services/galyleo/delete_table_confirm?name={{ table }}"><button>Delete</button></a>
                     <!--
                     {% set table_string = "'" + table + "'" %}
                     {% set call = '"confirmAndDelete(' + table_string  + ');"' %}
@@ -48,8 +51,17 @@
        
     </table>
     <h2>Other Tables</h2>
+    <table class="object-table">
         {% for table in tables["other"] %}
-            <a href="/services/galyleo/view_table?table={{ table }}">{{ table }}</a><br>
+            <tr>
+                <td>
+                    <a href="/services/galyleo/view_table?table={{ table }}">View {{ table }}</a>
+                </td>
+                <td>
+                    <a href="/services/galyleo/download_table?table={{ table }}"><button>Download SDML</button></a>
+                </td>
+            </tr>
         {%  endfor %}
+    </table>
     
 {% endblock %}
