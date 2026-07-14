@@ -891,7 +891,7 @@ def view_dashboard(user):
   galyleo_object = make_object_from_key(dashboard_name)
   if galyleo_object_manager.object_access_permitted(galyleo_object, email, email is not None):
     dashboard_url = f'{GALYLEO_ROOT_URL}/{dashboard_name}'
-    return redirect(f'{GALYLEO_STUDIO_URL}?dashboard={dashboard_url}')
+    return redirect(f'{GALYLEO_STUDIO_URL}?mode=interact&dashboard={dashboard_url}')
   else:
     flash(f'User {email} does not have permission to access {dashboard_name}')
     return redirect('/services/galyleo/view_dashboards')
